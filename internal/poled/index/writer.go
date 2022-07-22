@@ -10,8 +10,8 @@ type Writer struct {
 	*bluge.Writer
 }
 
-func NewWriter() (*Writer, error) {
-	conf := bluge.DefaultConfig("/var/www/go/pole/tests/indexes")
+func NewWriter(path string) (*Writer, error) {
+	conf := bluge.DefaultConfig(path)
 	writer, err := bluge.OpenWriter(conf)
 	if err != nil {
 		return nil, err

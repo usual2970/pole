@@ -10,8 +10,8 @@ type Reader struct {
 	*bluge.Reader
 }
 
-func NewReader() (*Reader, error) {
-	conf := bluge.DefaultConfig("/var/www/go/pole/tests/indexes")
+func NewReader(path string) (*Reader, error) {
+	conf := bluge.DefaultConfig(path)
 	reader, err := bluge.OpenReader(conf)
 	if err != nil {
 		return nil, err

@@ -11,12 +11,13 @@ import (
 )
 
 type poled struct {
+	conf    *Config
 	meta    meta
 	readers *index.Readers
 	writers *index.Writers
 }
 
-func NewPoled() (*poled, error) {
+func NewPoled(conf *Config) (*poled, error) {
 
 	return &poled{
 		meta: meta{
@@ -24,6 +25,7 @@ func NewPoled() (*poled, error) {
 		},
 		readers: index.NewReaders(),
 		writers: index.NewWriters(),
+		conf:    conf,
 	}, nil
 }
 
@@ -61,7 +63,7 @@ func (p *poled) execSelect(stmt *sqlRs) *generalResult {
 	reader, exists := p.readers.Get(idx)
 	var newReaderErr error
 	if !exists {
-		reader, newReaderErr = index.NewReader()
+		reader, newReaderErr = index.NewReader(p.conf.IndexPath)
 		if newReaderErr != nil {
 			return newGeneralResult(newReaderErr)
 		}
@@ -198,7 +200,7 @@ func (p *poled) execCreate(stmt *sqlRs) *generalResult {
 		}
 	}
 
-	writer, err := index.NewWriter()
+	writer, err := index.NewWriter(p.conf.IndexPath)
 	if err != nil {
 		lg.Error("create index failed:", err)
 		return newGeneralResult(err)

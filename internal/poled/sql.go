@@ -3,6 +3,7 @@ package poled
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/blugelabs/bluge"
 	"github.com/blugelabs/bluge/index"
@@ -25,8 +26,18 @@ const (
 	stmtTypeSelect stmtType = "select"
 )
 
+var parserOnce = sync.Once{}
+var sqlParser *parser.Parser
+
+func getParser() *parser.Parser {
+	parserOnce.Do(func() {
+		sqlParser = parser.New()
+	})
+	return sqlParser
+}
+
 func parse(sql string) (*sqlRs, error) {
-	p := parser.New()
+	p := getParser()
 	nodes, _, err := p.Parse(sql, "", "")
 	if err != nil {
 		return nil, err
