@@ -11,6 +11,7 @@ var (
 	ErrIndexExist         = errors.New("index already exists")
 	ErrIndexNotFound      = errors.New("index not found")
 	ErrWriterNotFound     = errors.New("writer not found")
+	ErrReaderNotFound     = errors.New("reader not found")
 	ErrSyntaxNotSupported = errors.New("syntax not supported")
 	ErrBatchFailed        = errors.New("batch failed")
 )

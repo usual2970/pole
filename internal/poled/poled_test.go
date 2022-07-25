@@ -53,13 +53,33 @@ func TestExec(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "update",
+			sql:  "update test set name='haha' where id=2",
+			want: nil,
+		},
+		{
 			name: "select",
 			sql:  "select * from test where name='hello'",
 			want: nil,
 		},
 		{
+			name: "update1",
+			sql:  "update test set name='haaaa' where id=2",
+			want: nil,
+		},
+		{
 			name: "delete",
-			sql:  "delete from test where id=1 and name='hello'",
+			sql:  "delete from test where id=1",
+			want: nil,
+		},
+		{
+			name: "select2",
+			sql:  "select * from test where name='hello'",
+			want: nil,
+		},
+		{
+			name: "select3",
+			sql:  "select * from test where name='hello'",
 			want: nil,
 		},
 		{

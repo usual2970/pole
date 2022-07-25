@@ -9,10 +9,10 @@ import (
 	"github.com/blugelabs/bluge/index"
 	"github.com/pingcap/tidb/parser"
 	"github.com/pingcap/tidb/parser/ast"
+	"github.com/pingcap/tidb/parser/opcode"
 	"github.com/pingcap/tidb/parser/test_driver"
 	_ "github.com/pingcap/tidb/parser/test_driver"
 	"github.com/pingcap/tidb/parser/types"
-	"github.com/rs/xid"
 )
 
 type stmtType string
@@ -24,6 +24,10 @@ const (
 	stmtTypeDrop   stmtType = "drop"
 	stmtTypeUpdate stmtType = "update"
 	stmtTypeSelect stmtType = "select"
+)
+
+var (
+	errDeleteCondition = errors.New("update operation's condition must be pattern 'id=xxx'")
 )
 
 var parserOnce = sync.Once{}
@@ -55,10 +59,8 @@ type sqlRs struct {
 	actionType   stmtType
 	colNames     []col
 	rows         []interface{}
-	where        bool
+	where        *ast.BinaryOperationExpr
 	selectAll    bool
-	whereColumns []col
-	whereRows    []interface{}
 	tableName    string
 }
 
@@ -94,16 +96,10 @@ func (s *sqlRs) docs(meta map[string]filedOptions) []*bluge.Document {
 			}
 			fields = append(fields, field)
 		}
-
-		for i, column := range s.whereColumns {
-			if column.name == "id" {
-				id = fmt.Sprintf("%v", s.whereRows[i])
-			}
+		if s.actionType == stmtTypeUpdate {
+			id, _ = s.getId()
 		}
 
-		if id == "" {
-			id = xid.New().String()
-		}
 		doc := bluge.NewDocument(id)
 		for _, field := range fields {
 			doc.AddField(field)
@@ -130,6 +126,7 @@ func (s *sqlRs) buildUpdateBatch(meta map[string]filedOptions) (*index.Batch, er
 		return nil, errors.New("not update operation")
 	}
 	batch := index.NewBatch()
+
 	docs := s.docs(meta)
 	for _, doc := range docs {
 		batch.Update(doc.ID(), doc)
@@ -142,20 +139,38 @@ func (s *sqlRs) buildDeleteBatch(meta map[string]filedOptions) (*index.Batch, er
 		return nil, errors.New("not delete operation")
 	}
 	batch := index.NewBatch()
-	var id string
-	for i, column := range s.whereColumns {
-		if column.name == "id" {
-			id = fmt.Sprintf("%v", s.whereRows[i])
-		}
+	id, err := s.getId()
+	if err != nil {
+		return nil, err
 	}
-
-	if id == "" {
-		id = xid.New().String()
-	}
-
 	batch.Delete(bluge.Identifier(id))
 
 	return batch, nil
+}
+
+func (s *sqlRs) getId() (string, error) {
+	if s.where == nil {
+		return "", errDeleteCondition
+	}
+	if s.where.Op != opcode.EQ {
+		return "", errDeleteCondition
+	}
+
+	columnName, ok := s.where.L.(*ast.ColumnNameExpr)
+	if !ok {
+		return "", errDeleteCondition
+	}
+
+	if columnName.Name.Name.O != "id" {
+		return "", errDeleteCondition
+	}
+
+	value, ok := s.where.R.(*test_driver.ValueExpr)
+	if !ok {
+		return "", errDeleteCondition
+	}
+
+	return fmt.Sprintf("%v", value.GetValue()), nil
 }
 
 func getNumericValue(value interface{}) float64 {
@@ -183,22 +198,11 @@ func (s *sqlRs) Enter(in ast.Node) (ast.Node, bool) {
 		})
 		return in, true
 	case *ast.ColumnName:
-		if s.where {
-			s.whereColumns = append(s.whereColumns, col{
-				name: node.Name.O,
-				typ:  types.ETInt,
-			})
-			break
-		}
 		s.colNames = append(s.colNames, col{
 			name: node.Name.O,
 			typ:  types.ETInt,
 		})
 	case *test_driver.ValueExpr:
-		if s.where {
-			s.whereRows = append(s.whereRows, node.GetValue())
-			break
-		}
 		s.rows = append(s.rows, node.GetValue())
 	case *ast.DeleteStmt:
 		s.actionType = stmtTypeDelete
@@ -207,7 +211,10 @@ func (s *sqlRs) Enter(in ast.Node) (ast.Node, bool) {
 	case *ast.UpdateStmt:
 		s.actionType = stmtTypeUpdate
 	case *ast.BinaryOperationExpr:
-		s.where = true
+		if s.tableName != "" {
+			s.where = node
+		}
+		return in, true
 	case *ast.SelectStmt:
 		s.actionType = stmtTypeSelect
 	case *ast.FieldList:

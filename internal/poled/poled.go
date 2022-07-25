@@ -23,7 +23,7 @@ func NewPoled(conf *Config) (*poled, error) {
 		meta: meta{
 			MetaData: make(map[string]map[string]filedOptions),
 		},
-		readers: index.NewReaders(),
+		readers: index.NewReaders(conf.IndexPath),
 		writers: index.NewWriters(),
 		conf:    conf,
 	}, nil
@@ -61,16 +61,9 @@ func (p *poled) execSelect(stmt *sqlRs) *generalResult {
 	}
 
 	reader, exists := p.readers.Get(idx)
-	var newReaderErr error
 	if !exists {
-		reader, newReaderErr = index.NewReader(p.conf.IndexPath)
-		if newReaderErr != nil {
-			return newGeneralResult(newReaderErr)
-		}
-
-		p.readers.Add(idx, reader)
+		return newGeneralResult(ErrReaderNotFound)
 	}
-
 	query := bluge.NewMatchAllQuery()
 	req := bluge.NewTopNSearch(100, query).WithStandardAggregations().
 		IncludeLocations().
@@ -125,6 +118,8 @@ func (p *poled) execDelete(stmt *sqlRs) *generalResult {
 		return newGeneralResult(err)
 	}
 
+	p.readers.Delete(idx)
+
 	return newGeneralResult(nil)
 }
 
@@ -153,6 +148,8 @@ func (p *poled) execUpdate(stmt *sqlRs) *generalResult {
 		lg.Error(ErrBatchFailed)
 		return newGeneralResult(err)
 	}
+
+	p.readers.Delete(idx)
 
 	return newGeneralResult(nil)
 
@@ -183,6 +180,8 @@ func (p *poled) execInsert(stmt *sqlRs) *generalResult {
 		return newGeneralResult(err)
 	}
 
+	p.readers.Delete(idx)
+
 	return newGeneralResult(nil)
 }
 
@@ -209,6 +208,7 @@ func (p *poled) execCreate(stmt *sqlRs) *generalResult {
 	p.writers.Add(idx, writer)
 
 	p.meta.Add(idx, fields)
+
 	return newGeneralResult(nil)
 }
 

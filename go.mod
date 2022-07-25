@@ -5,8 +5,8 @@ go 1.17
 require (
 	github.com/blugelabs/bluge v0.2.2
 	github.com/pingcap/tidb/parser v0.0.0-20220627062839-d6be9105e6c4
-	github.com/rs/xid v1.4.0
 	go.uber.org/zap v1.21.0
+	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	gopkg.in/natefinch/lumberjack.v2 v2.0.0
 )
 
@@ -30,6 +30,7 @@ require (
 	github.com/mschoch/smat v0.2.0 // indirect
 	github.com/pingcap/errors v0.11.5-0.20210425183316-da1aaba5fb63 // indirect
 	github.com/pingcap/log v0.0.0-20210625125904-98ed8e2eb1c7 // indirect
+	github.com/rs/xid v1.4.0 // indirect
 	github.com/xwb1989/sqlparser v0.0.0-20180606152119-120387863bf2 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/multierr v1.6.0 // indirect

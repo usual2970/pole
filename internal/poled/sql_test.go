@@ -30,7 +30,7 @@ func TestParse(t *testing.T) {
 		},
 		{
 			name:"select-name",
-			sql:"select name,sex from test where name='hello'",
+			sql:"select name,sex from test where name='hello' and (id=1 or name=3)",
 			want: nil,
 		},
 		{
@@ -41,6 +41,11 @@ func TestParse(t *testing.T) {
 		{
 			name: "update",
 			sql:  "update test set name='haha' where id=1",
+			want: nil,
+		},
+		{
+			name:"select-name",
+			sql:"select name,sex from test where name='hello' and (id=1 or name=3)",
 			want: nil,
 		},
 		{
