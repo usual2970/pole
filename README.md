@@ -11,9 +11,10 @@ pole索引内容可以保存在本地文件系统以及对象存储服务(oss,co
 ## Roadmap
 
 - [ ] sql 解析
-- [ ] sharding支持
 - [ ] metadata 存储
 - [ ] grpc、restful api
+- [ ] ui
+- [ ] sharding支持
 - [ ] 中文分词
 - [ ] index 数据oss、cos存储
 - [ ] cluster 模式支持、metadata同步以及分布式锁
