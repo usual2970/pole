@@ -19,17 +19,17 @@ var (
 	ErrSyntaxNotSupported = errors.New("syntax not supported")
 )
 
-type BinaryOperationVisitor struct {
+type WhereVisitor struct {
 	prefixQueryNodes *list.List
 }
 
-func NewBinaryOperationVisitor() *BinaryOperationVisitor {
-	return &BinaryOperationVisitor{
+func NewBinaryOperationVisitor() *WhereVisitor {
+	return &WhereVisitor{
 		prefixQueryNodes: list.New(),
 	}
 }
 
-func (s *BinaryOperationVisitor) Enter(in ast.Node) (ast.Node, bool) {
+func (s *WhereVisitor) Enter(in ast.Node) (ast.Node, bool) {
 	switch node := in.(type) {
 	case *ast.ParenthesesExpr, *ast.ColumnNameExpr:
 		break
@@ -39,11 +39,11 @@ func (s *BinaryOperationVisitor) Enter(in ast.Node) (ast.Node, bool) {
 	return in, false
 }
 
-func (s *BinaryOperationVisitor) Leave(in ast.Node) (ast.Node, bool) {
+func (s *WhereVisitor) Leave(in ast.Node) (ast.Node, bool) {
 	return in, true
 }
 
-func (s *BinaryOperationVisitor) buildQuery() (bluge.Query, error) {
+func (s *WhereVisitor) buildQuery() (bluge.Query, error) {
 	calList := list.New()
 	for s.prefixQueryNodes.Len() > 0 {
 		back := s.prefixQueryNodes.Back()
@@ -67,7 +67,7 @@ func (s *BinaryOperationVisitor) buildQuery() (bluge.Query, error) {
 	return calList.Back().Value.(bluge.Query), nil
 }
 
-func (s *BinaryOperationVisitor) buildSingleQuery(node1, node2 interface{}, expr interface{}) (bluge.Query, error) {
+func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface{}) (bluge.Query, error) {
 	var query bluge.Query
 	switch expr := expr.(type) {
 	case *ast.PatternLikeExpr:
