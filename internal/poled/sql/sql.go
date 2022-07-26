@@ -1,4 +1,4 @@
-package poled
+package sql
 
 import (
 	"errors"
@@ -13,17 +13,18 @@ import (
 	"github.com/pingcap/tidb/parser/test_driver"
 	_ "github.com/pingcap/tidb/parser/test_driver"
 	"github.com/pingcap/tidb/parser/types"
+	"pole/internal/poled/meta"
 )
 
 type stmtType string
 
 const (
-	stmtTypeInsert stmtType = "insert"
-	stmtTypeCreate stmtType = "create"
-	stmtTypeDelete stmtType = "delete"
-	stmtTypeDrop   stmtType = "drop"
-	stmtTypeUpdate stmtType = "update"
-	stmtTypeSelect stmtType = "select"
+	StmtTypeInsert stmtType = "insert"
+	StmtTypeCreate stmtType = "create"
+	StmtTypeDelete stmtType = "delete"
+	StmtTypeDrop   stmtType = "drop"
+	StmtTypeUpdate stmtType = "update"
+	StmtTypeSelect stmtType = "select"
 )
 
 var (
@@ -40,7 +41,7 @@ func getParser() *parser.Parser {
 	return sqlParser
 }
 
-func parse(sql string) (*sqlRs, error) {
+func Parse(sql string) (*SqlVistor, error) {
 	p := getParser()
 	nodes, _, err := p.Parse(sql, "", "")
 	if err != nil {
@@ -51,29 +52,29 @@ func parse(sql string) (*sqlRs, error) {
 }
 
 type col struct {
-	name string
-	typ  types.EvalType
+	Name string
+	Typ  types.EvalType
 }
 
-type sqlRs struct {
-	actionType   stmtType
-	colNames     []col
-	rows         []interface{}
-	where        *ast.BinaryOperationExpr
-	selectAll    bool
-	tableName    string
+type SqlVistor struct {
+	ActionType stmtType
+	ColNames   []col
+	rows       []interface{}
+	where      ast.Node
+	selectAll  bool
+	TableName  string
 }
 
-func (s *sqlRs) docs(meta map[string]filedOptions) []*bluge.Document {
-	columnCount := len(s.colNames)
+func (s *SqlVistor) docs(metas map[string]meta.FiledOptions) []*bluge.Document {
+	columnCount := len(s.ColNames)
 	var docs []*bluge.Document
-	for i := 0; i < len(s.rows)/len(s.colNames); i++ {
+	for i := 0; i < len(s.rows)/len(s.ColNames); i++ {
 		var id string
 		var fields []*bluge.TermField
 		offset := columnCount * i
 		for j := 0; j < columnCount; j++ {
-			name := s.colNames[j].name
-			option, ok := meta[name]
+			name := s.ColNames[j].Name
+			option, ok := metas[name]
 			if !ok {
 				continue
 			}
@@ -84,10 +85,10 @@ func (s *sqlRs) docs(meta map[string]filedOptions) []*bluge.Document {
 			}
 			var field *bluge.TermField
 			switch option.Type {
-			case fieldTypeNumeric:
+			case meta.FieldTypeNumeric:
 				field = bluge.NewNumericField(name, getNumericValue(value))
 
-			case fieldTypeText:
+			case meta.FieldTypeText:
 				field = bluge.NewTextField(name, fmt.Sprintf("%v", value))
 				field.FieldOptions = 3
 			}
@@ -96,7 +97,7 @@ func (s *sqlRs) docs(meta map[string]filedOptions) []*bluge.Document {
 			}
 			fields = append(fields, field)
 		}
-		if s.actionType == stmtTypeUpdate {
+		if s.ActionType == StmtTypeUpdate {
 			id, _ = s.getId()
 		}
 
@@ -109,8 +110,8 @@ func (s *sqlRs) docs(meta map[string]filedOptions) []*bluge.Document {
 	return docs
 }
 
-func (s *sqlRs) buildInsertBatch(meta map[string]filedOptions) (*index.Batch, error) {
-	if s.actionType != stmtTypeInsert {
+func (s *SqlVistor) BuildInsertBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+	if s.ActionType != StmtTypeInsert {
 		return nil, errors.New("not insert operation")
 	}
 	batch := index.NewBatch()
@@ -121,8 +122,8 @@ func (s *sqlRs) buildInsertBatch(meta map[string]filedOptions) (*index.Batch, er
 	return batch, nil
 }
 
-func (s *sqlRs) buildUpdateBatch(meta map[string]filedOptions) (*index.Batch, error) {
-	if s.actionType != stmtTypeUpdate {
+func (s *SqlVistor) BuildUpdateBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+	if s.ActionType != StmtTypeUpdate {
 		return nil, errors.New("not update operation")
 	}
 	batch := index.NewBatch()
@@ -134,8 +135,8 @@ func (s *sqlRs) buildUpdateBatch(meta map[string]filedOptions) (*index.Batch, er
 	return batch, nil
 }
 
-func (s *sqlRs) buildDeleteBatch(meta map[string]filedOptions) (*index.Batch, error) {
-	if s.actionType != stmtTypeDelete {
+func (s *SqlVistor) BuildDeleteBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+	if s.ActionType != StmtTypeDelete {
 		return nil, errors.New("not delete operation")
 	}
 	batch := index.NewBatch()
@@ -148,15 +149,33 @@ func (s *sqlRs) buildDeleteBatch(meta map[string]filedOptions) (*index.Batch, er
 	return batch, nil
 }
 
-func (s *sqlRs) getId() (string, error) {
+func (s *SqlVistor) BuildRequest() (bluge.SearchRequest, error) {
+	visitor := NewBinaryOperationVisitor()
+	s.where.Accept(visitor)
+	query, err := visitor.buildQuery()
+	if err != nil {
+		return nil, err
+	}
+
+	req := bluge.NewTopNSearch(100, query).WithStandardAggregations().
+		IncludeLocations().
+		ExplainScores()
+	return req, nil
+}
+
+func (s *SqlVistor) getId() (string, error) {
 	if s.where == nil {
 		return "", errDeleteCondition
 	}
-	if s.where.Op != opcode.EQ {
+	where, ok := s.where.(*ast.BinaryOperationExpr)
+	if !ok{
+		return "", errDeleteCondition
+	}
+	if where.Op != opcode.EQ {
 		return "", errDeleteCondition
 	}
 
-	columnName, ok := s.where.L.(*ast.ColumnNameExpr)
+	columnName, ok := where.L.(*ast.ColumnNameExpr)
 	if !ok {
 		return "", errDeleteCondition
 	}
@@ -165,7 +184,7 @@ func (s *sqlRs) getId() (string, error) {
 		return "", errDeleteCondition
 	}
 
-	value, ok := s.where.R.(*test_driver.ValueExpr)
+	value, ok := where.R.(*test_driver.ValueExpr)
 	if !ok {
 		return "", errDeleteCondition
 	}
@@ -183,49 +202,49 @@ func getNumericValue(value interface{}) float64 {
 	return 0
 }
 
-func (s *sqlRs) Enter(in ast.Node) (ast.Node, bool) {
+func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {
 	switch node := in.(type) {
 	case *ast.InsertStmt:
-		s.actionType = stmtTypeInsert
+		s.ActionType = StmtTypeInsert
 	case *ast.CreateTableStmt:
-		s.actionType = stmtTypeCreate
+		s.ActionType = StmtTypeCreate
 	case *ast.TableName:
-		s.tableName = node.Name.O
+		s.TableName = node.Name.O
 	case *ast.ColumnDef:
-		s.colNames = append(s.colNames, col{
-			name: node.Name.Name.O,
-			typ:  node.Tp.EvalType(),
+		s.ColNames = append(s.ColNames, col{
+			Name: node.Name.Name.O,
+			Typ:  node.Tp.EvalType(),
 		})
 		return in, true
 	case *ast.ColumnName:
-		s.colNames = append(s.colNames, col{
-			name: node.Name.O,
-			typ:  types.ETInt,
+		s.ColNames = append(s.ColNames, col{
+			Name: node.Name.O,
+			Typ:  types.ETInt,
 		})
 	case *test_driver.ValueExpr:
 		s.rows = append(s.rows, node.GetValue())
 	case *ast.DeleteStmt:
-		s.actionType = stmtTypeDelete
+		s.ActionType = StmtTypeDelete
 	case *ast.DropTableStmt:
-		s.actionType = stmtTypeDrop
+		s.ActionType = StmtTypeDrop
 	case *ast.UpdateStmt:
-		s.actionType = stmtTypeUpdate
-	case *ast.BinaryOperationExpr:
-		if s.tableName != "" {
+		s.ActionType = StmtTypeUpdate
+	case *ast.BinaryOperationExpr, *ast.PatternInExpr, *ast.PatternLikeExpr:
+		if s.TableName != "" {
 			s.where = node
 		}
 		return in, true
 	case *ast.SelectStmt:
-		s.actionType = stmtTypeSelect
+		s.ActionType = StmtTypeSelect
 	case *ast.FieldList:
 		for _, field := range node.Fields {
 			if field.WildCard != nil {
 				s.selectAll = true
 				break
 			}
-			s.colNames = append(s.colNames, col{
-				name: field.Expr.(*ast.ColumnNameExpr).Name.Name.O,
-				typ:  types.ETInt,
+			s.ColNames = append(s.ColNames, col{
+				Name: field.Expr.(*ast.ColumnNameExpr).Name.Name.O,
+				Typ:  types.ETInt,
 			})
 		}
 		return in, true
@@ -233,12 +252,12 @@ func (s *sqlRs) Enter(in ast.Node) (ast.Node, bool) {
 	return in, false
 }
 
-func (s *sqlRs) Leave(in ast.Node) (ast.Node, bool) {
+func (s *SqlVistor) Leave(in ast.Node) (ast.Node, bool) {
 	return in, true
 }
 
-func extract(rootNode *ast.StmtNode) *sqlRs {
-	v := &sqlRs{}
+func extract(rootNode *ast.StmtNode) *SqlVistor {
+	v := &SqlVistor{}
 	(*rootNode).Accept(v)
 	return v
 }

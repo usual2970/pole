@@ -74,7 +74,7 @@ func TestExec(t *testing.T) {
 		},
 		{
 			name: "select2",
-			sql:  "select * from test where name='hello'",
+			sql:  "select * from test where name like 'h*'",
 			want: nil,
 		},
 		{
