@@ -83,6 +83,16 @@ func TestExec(t *testing.T) {
 			want: nil,
 		},
 		{
+			name: "select3",
+			sql:  "select * from test where id=2",
+			want: nil,
+		},
+		{
+			name: "select-in",
+			sql:  "select * from test where id in(1,2,3)",
+			want: nil,
+		},
+		{
 			name: "drop",
 			sql:  "drop table test",
 			want: nil,

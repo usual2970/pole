@@ -149,14 +149,13 @@ func (s *SqlVistor) BuildDeleteBatch(meta map[string]meta.FiledOptions) (*index.
 	return batch, nil
 }
 
-func (s *SqlVistor) BuildRequest() (bluge.SearchRequest, error) {
+func (s *SqlVistor) BuildRequest(meta map[string]meta.FiledOptions) (bluge.SearchRequest, error) {
 	visitor := NewBinaryOperationVisitor()
 	s.where.Accept(visitor)
-	query, err := visitor.buildQuery()
+	query, err := visitor.buildQuery(meta)
 	if err != nil {
 		return nil, err
 	}
-
 	req := bluge.NewTopNSearch(100, query).WithStandardAggregations().
 		IncludeLocations().
 		ExplainScores()
@@ -168,7 +167,7 @@ func (s *SqlVistor) getId() (string, error) {
 		return "", errDeleteCondition
 	}
 	where, ok := s.where.(*ast.BinaryOperationExpr)
-	if !ok{
+	if !ok {
 		return "", errDeleteCondition
 	}
 	if where.Op != opcode.EQ {

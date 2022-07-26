@@ -55,7 +55,7 @@ func (p *poled) Exec(sql string) result {
 func (p *poled) execSelect(stmt *sqlParser.SqlVistor) *generalResult {
 	idx := stmt.TableName
 	lg := log.WithField("module", "delete_index").WithField("index", idx)
-	_, exists := p.meta.Get(idx)
+	meta, exists := p.meta.Get(idx)
 	if !exists {
 		lg.Error(ErrIndexNotFound)
 		return newGeneralResult(ErrIndexNotFound)
@@ -65,7 +65,7 @@ func (p *poled) execSelect(stmt *sqlParser.SqlVistor) *generalResult {
 	if !exists {
 		return newGeneralResult(ErrReaderNotFound)
 	}
-	req, err := stmt.BuildRequest()
+	req, err := stmt.BuildRequest(meta)
 	if err != nil {
 		return newGeneralResult(err)
 	}

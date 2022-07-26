@@ -95,6 +95,11 @@ func TestBuildRequest(t *testing.T) {
 			sql:  "select Name,sex from test where Name like 'hello'",
 			want: nil,
 		},
+		{
+			name: "select-in",
+			sql:  "select Name,sex from test where id in (1,2,3)",
+			want: nil,
+		},
 	}
 
 	for _, tt := range tests {
@@ -104,7 +109,7 @@ func TestBuildRequest(t *testing.T) {
 				t.Logf("Parse() error = %v, want %v", err, tt.want)
 				t.Fail()
 			}
-			req, err := rs.BuildRequest()
+			req, err := rs.BuildRequest(nil)
 			if err != tt.want {
 				t.Logf("BuildRequest() error = %v, want %v", err, tt.want)
 				t.Fail()
