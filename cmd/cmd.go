@@ -9,6 +9,7 @@ import (
 	"github.com/joho/godotenv"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	poled2 "pole/internal/poled"
 	"pole/internal/server"
 )
 
@@ -18,15 +19,21 @@ const (
 
 var (
 	// Used for flags.
-	cfgFile     string
-	envFile     string
+	cfgFile string
+	envFile string
 
 	poleCmd = &cobra.Command{
 		Use:   "pole",
 		Short: "A full text Search engine",
 		Long:  `A full text Search engine that use sql to create,update,query,delete index data`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			httpServer, err := server.NewHttpServer("127.0.0.1:5000")
+
+			conf := poled2.DefaultConfig()
+			poled, err := poled2.NewPoled(conf)
+			if err != nil {
+				return err
+			}
+			httpServer, err := server.NewHttpServer("127.0.0.1:5000", poled)
 			if err != nil {
 				return err
 			}

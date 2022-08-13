@@ -44,7 +44,7 @@ func (s *WhereVisitor) Leave(in ast.Node) (ast.Node, bool) {
 	return in, true
 }
 
-func (s *WhereVisitor) buildQuery(meta map[string]meta.FiledOptions) (bluge.Query, error) {
+func (s *WhereVisitor) buildQuery(meta meta.Mapping) (bluge.Query, error) {
 	calList := list.New()
 	for s.prefixQueryNodes.Len() > 0 {
 		back := s.prefixQueryNodes.Back()
@@ -68,7 +68,7 @@ func (s *WhereVisitor) buildQuery(meta map[string]meta.FiledOptions) (bluge.Quer
 	return calList.Back().Value.(bluge.Query), nil
 }
 
-func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface{}, meta map[string]meta.FiledOptions) (bluge.Query, error) {
+func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface{}, meta meta.Mapping) (bluge.Query, error) {
 	var query bluge.Query
 	switch expr := expr.(type) {
 	case *ast.PatternInExpr:

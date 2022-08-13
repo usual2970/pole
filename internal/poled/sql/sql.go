@@ -65,7 +65,7 @@ type SqlVistor struct {
 	TableName  string
 }
 
-func (s *SqlVistor) docs(metas map[string]meta.FiledOptions) []*bluge.Document {
+func (s *SqlVistor) docs(metas meta.Mapping) []*bluge.Document {
 	columnCount := len(s.ColNames)
 	var docs []*bluge.Document
 	for i := 0; i < len(s.rows)/len(s.ColNames); i++ {
@@ -74,7 +74,7 @@ func (s *SqlVistor) docs(metas map[string]meta.FiledOptions) []*bluge.Document {
 		offset := columnCount * i
 		for j := 0; j < columnCount; j++ {
 			name := s.ColNames[j].Name
-			option, ok := metas[name]
+			option, ok := metas.Properties[name]
 			if !ok {
 				continue
 			}
@@ -87,7 +87,7 @@ func (s *SqlVistor) docs(metas map[string]meta.FiledOptions) []*bluge.Document {
 			switch option.Type {
 			case meta.FieldTypeNumeric:
 				field = bluge.NewNumericField(name, getNumericValue(value))
-
+				field.FieldOptions = 51
 			case meta.FieldTypeText:
 				field = bluge.NewTextField(name, fmt.Sprintf("%v", value))
 				field.FieldOptions = 3
@@ -110,7 +110,7 @@ func (s *SqlVistor) docs(metas map[string]meta.FiledOptions) []*bluge.Document {
 	return docs
 }
 
-func (s *SqlVistor) BuildInsertBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+func (s *SqlVistor) BuildInsertBatch(meta meta.Mapping) (*index.Batch, error) {
 	if s.ActionType != StmtTypeInsert {
 		return nil, errors.New("not insert operation")
 	}
@@ -122,7 +122,7 @@ func (s *SqlVistor) BuildInsertBatch(meta map[string]meta.FiledOptions) (*index.
 	return batch, nil
 }
 
-func (s *SqlVistor) BuildUpdateBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+func (s *SqlVistor) BuildUpdateBatch(meta meta.Mapping) (*index.Batch, error) {
 	if s.ActionType != StmtTypeUpdate {
 		return nil, errors.New("not update operation")
 	}
@@ -135,7 +135,7 @@ func (s *SqlVistor) BuildUpdateBatch(meta map[string]meta.FiledOptions) (*index.
 	return batch, nil
 }
 
-func (s *SqlVistor) BuildDeleteBatch(meta map[string]meta.FiledOptions) (*index.Batch, error) {
+func (s *SqlVistor) BuildDeleteBatch(meta meta.Mapping) (*index.Batch, error) {
 	if s.ActionType != StmtTypeDelete {
 		return nil, errors.New("not delete operation")
 	}
@@ -149,13 +149,21 @@ func (s *SqlVistor) BuildDeleteBatch(meta map[string]meta.FiledOptions) (*index.
 	return batch, nil
 }
 
-func (s *SqlVistor) BuildRequest(meta map[string]meta.FiledOptions) (bluge.SearchRequest, error) {
-	visitor := NewBinaryOperationVisitor()
-	s.where.Accept(visitor)
-	query, err := visitor.buildQuery(meta)
-	if err != nil {
-		return nil, err
+func (s *SqlVistor) BuildRequest(meta meta.Mapping) (bluge.SearchRequest, error) {
+
+	var query bluge.Query
+	if s.where == nil {
+		query = bluge.NewMatchAllQuery()
+	} else {
+		visitor := NewBinaryOperationVisitor()
+		s.where.Accept(visitor)
+		var err error
+		query, err = visitor.buildQuery(meta)
+		if err != nil {
+			return nil, err
+		}
 	}
+
 	req := bluge.NewTopNSearch(100, query).WithStandardAggregations().
 		IncludeLocations().
 		ExplainScores()

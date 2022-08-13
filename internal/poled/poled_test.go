@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func mustNewPoled() *poled {
+func mustNewPoled() *Poled {
 	conf := DefaultConfig()
 	conf.IndexPath="/var/www/go/pole/tests/indexes"
 	pd, err := NewPoled(conf)
@@ -17,14 +17,14 @@ func mustNewPoled() *poled {
 func TestNewPoled(t *testing.T) {
 	pd := mustNewPoled()
 	if pd == nil {
-		t.Fatal("init poled failed")
+		t.Fatal("init Poled failed")
 	}
 }
 
 func TestExec(t *testing.T) {
 	pd := mustNewPoled()
 	if pd == nil {
-		t.Fatal("init poled failed")
+		t.Fatal("init Poled failed")
 	}
 
 	tests := []struct {
@@ -103,7 +103,7 @@ func TestExec(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			rs := pd.Exec(tt.sql)
 			if rs.Error() != tt.want {
-				t.Logf("poled.Exec() error = %v, want %v", rs.Error(), tt.want)
+				t.Logf("Poled.Exec() error = %v, want %v", rs.Error(), tt.want)
 				t.Fail()
 			} else {
 				t.Log(pd.meta.All())
