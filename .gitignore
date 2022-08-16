@@ -2,3 +2,5 @@
 vendor
 tests/indexes
 pole
+__debug_bin
+.vscode

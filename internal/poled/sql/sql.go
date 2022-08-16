@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"pole/internal/poled/meta"
+
 	"github.com/blugelabs/bluge"
 	"github.com/blugelabs/bluge/index"
 	"github.com/pingcap/tidb/parser"
@@ -13,7 +15,6 @@ import (
 	"github.com/pingcap/tidb/parser/test_driver"
 	_ "github.com/pingcap/tidb/parser/test_driver"
 	"github.com/pingcap/tidb/parser/types"
-	"pole/internal/poled/meta"
 )
 
 type stmtType string
@@ -70,29 +71,17 @@ func (s *SqlVistor) docs(metas meta.Mapping) []*bluge.Document {
 	var docs []*bluge.Document
 	for i := 0; i < len(s.rows)/len(s.ColNames); i++ {
 		var id string
-		var fields []*bluge.TermField
+		var fields []bluge.Field
 		offset := columnCount * i
 		for j := 0; j < columnCount; j++ {
 			name := s.ColNames[j].Name
-			option, ok := metas.Properties[name]
-			if !ok {
-				continue
-			}
 			value := s.rows[offset+j]
 			if name == "id" {
 				id = fmt.Sprintf("%v", value)
 				continue
 			}
-			var field *bluge.TermField
-			switch option.Type {
-			case meta.FieldTypeNumeric:
-				field = bluge.NewNumericField(name, getNumericValue(value))
-				field.FieldOptions = 51
-			case meta.FieldTypeText:
-				field = bluge.NewTextField(name, fmt.Sprintf("%v", value))
-				field.FieldOptions = 3
-			}
-			if field == nil {
+			field, err := metas.MakeField(name, value)
+			if field == nil || err != nil {
 				continue
 			}
 			fields = append(fields, field)

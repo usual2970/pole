@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"pole/internal/poled/meta"
 	"testing"
 )
 
@@ -109,7 +110,7 @@ func TestBuildRequest(t *testing.T) {
 				t.Logf("Parse() error = %v, want %v", err, tt.want)
 				t.Fail()
 			}
-			req, err := rs.BuildRequest(nil)
+			req, err := rs.BuildRequest(meta.Mapping{})
 			if err != tt.want {
 				t.Logf("BuildRequest() error = %v, want %v", err, tt.want)
 				t.Fail()
