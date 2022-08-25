@@ -2,14 +2,12 @@ package poled
 
 import (
 	"context"
-	"fmt"
 
 	"pole/internal/poled/index"
 	"pole/internal/poled/meta"
 	sqlParser "pole/internal/poled/sql"
 	"pole/internal/util/log"
 
-	segment "github.com/blugelabs/bluge_segment_api"
 	"github.com/pingcap/tidb/parser/types"
 )
 
@@ -54,7 +52,7 @@ func (p *Poled) Exec(sql string) result {
 	}
 	return newGeneralResult(ErrSyntaxNotSupported)
 }
-func (p *Poled) execSelect(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execSelect(stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	lg := log.WithField("module", "exec select").WithField("index", idx)
 	meta, exists := p.meta.Get(idx)
@@ -75,26 +73,10 @@ func (p *Poled) execSelect(stmt *sqlParser.SqlVistor) *generalResult {
 	if err != nil {
 		return newGeneralResult(err)
 	}
-	next, err := iter.Next()
-	for err == nil && next != nil {
-		err = next.VisitStoredFields(func(field string, value []byte) bool {
-
-			fmt.Println(field, string(value))
-			return true
-		})
-		if err != nil {
-			return newGeneralResult(err)
-		}
-		next, err = iter.Next()
-	}
-	if err != nil {
-		return newGeneralResult(err)
-	}
-
-	return newGeneralResult(nil)
+	return newSelectResult(iter, meta, stmt.ColNames, stmt.SelectAll)
 }
 
-func (p *Poled) execDelete(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execDelete(stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	lg := log.WithField("module", "delete_index").WithField("index", idx)
 	meta, exists := p.meta.Get(idx)
@@ -125,7 +107,7 @@ func (p *Poled) execDelete(stmt *sqlParser.SqlVistor) *generalResult {
 	return newGeneralResult(nil)
 }
 
-func (p *Poled) execUpdate(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execUpdate(stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	lg := log.WithField("module", "update_index").WithField("index", idx)
 	meta, exists := p.meta.Get(idx)
@@ -157,7 +139,7 @@ func (p *Poled) execUpdate(stmt *sqlParser.SqlVistor) *generalResult {
 
 }
 
-func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	lg := log.WithField("module", "insert_index").WithField("index", idx)
 	meta, exists := p.meta.Get(idx)
@@ -187,7 +169,7 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) *generalResult {
 	return newGeneralResult(nil)
 }
 
-func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
 	lg := log.WithField("module", "create_index")
 	idx := stmt.TableName
 	if p.meta.Exists(idx) {
@@ -214,7 +196,7 @@ func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) *generalResult {
 	return newGeneralResult(nil)
 }
 
-func (p *Poled) execDrop(stmt *sqlParser.SqlVistor) *generalResult {
+func (p *Poled) execDrop(stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	if !p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexNotFound)
@@ -235,10 +217,4 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 	}
 
 	return meta.FieldTypeUnknown
-}
-
-func storedFieldVisitor() segment.StoredFieldVisitor {
-	return func(field string, value []byte) bool {
-		return true
-	}
 }

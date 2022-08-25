@@ -52,17 +52,17 @@ func Parse(sql string) (*SqlVistor, error) {
 	return extract(&nodes[0]), nil
 }
 
-type col struct {
+type Col struct {
 	Name string
 	Typ  types.EvalType
 }
 
 type SqlVistor struct {
 	ActionType stmtType
-	ColNames   []col
+	ColNames   []Col
 	rows       []interface{}
 	where      ast.Node
-	selectAll  bool
+	SelectAll  bool
 	TableName  string
 }
 
@@ -207,13 +207,13 @@ func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {
 	case *ast.TableName:
 		s.TableName = node.Name.O
 	case *ast.ColumnDef:
-		s.ColNames = append(s.ColNames, col{
+		s.ColNames = append(s.ColNames, Col{
 			Name: node.Name.Name.O,
 			Typ:  node.Tp.EvalType(),
 		})
 		return in, true
 	case *ast.ColumnName:
-		s.ColNames = append(s.ColNames, col{
+		s.ColNames = append(s.ColNames, Col{
 			Name: node.Name.O,
 			Typ:  types.ETInt,
 		})
@@ -235,10 +235,10 @@ func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {
 	case *ast.FieldList:
 		for _, field := range node.Fields {
 			if field.WildCard != nil {
-				s.selectAll = true
+				s.SelectAll = true
 				break
 			}
-			s.ColNames = append(s.ColNames, col{
+			s.ColNames = append(s.ColNames, Col{
 				Name: field.Expr.(*ast.ColumnNameExpr).Name.Name.O,
 				Typ:  types.ETInt,
 			})
