@@ -118,6 +118,16 @@ func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface
 				return nil, ErrEqRightMustBeValue
 			}
 			query = makeEqQuery(column, value.GetValue(), meta)
+		case opcode.GE, opcode.GT, opcode.LE, opcode.LT:
+			column, ok := node1.(*ast.ColumnName)
+			if !ok {
+				return nil, ErrEqLeftMustBeColumn
+			}
+			value, ok := node2.(*test_driver.ValueExpr)
+			if !ok {
+				return nil, ErrEqRightMustBeValue
+			}
+			query = makeRangeQuery(column, value.GetValue(), meta, expr.Op)
 		case opcode.LogicAnd:
 			query1, ok := node1.(bluge.Query)
 			if !ok {
@@ -169,4 +179,51 @@ func makeEqQuery(column *ast.ColumnName, value interface{}, m meta.Mapping) blug
 		return bluge.NewMatchQuery(fmt.Sprintf("%v", value)).SetField(colName)
 	}
 	return nil
+}
+
+func makeRangeQuery(column *ast.ColumnName, value interface{}, m meta.Mapping, opCode opcode.Op) bluge.Query {
+	colName := columnName(column)
+	if colName == meta.IdentifierField {
+		return bluge.NewMatchQuery(fmt.Sprintf("%v", value)).SetField(colName)
+	}
+
+	filedOption := m.Properties[colName]
+	switch filedOption.Type {
+	case meta.FieldTypeNumeric:
+		v, _ := strconv.ParseFloat(fmt.Sprintf("%v", value), 64)
+		return makeNumericRangeQuery(colName, v, opCode)
+	case meta.FieldTypeText:
+		return makeTermRangeQuery(colName, fmt.Sprintf("%v", value), opCode)
+	}
+	return nil
+}
+
+func makeTermRangeQuery(field string, value string, opCode opcode.Op) bluge.Query {
+	var query *bluge.TermRangeQuery
+	switch opCode {
+	case opcode.GT:
+		query = bluge.NewTermRangeInclusiveQuery(value, "", false, false)
+	case opcode.GE:
+		query = bluge.NewTermRangeInclusiveQuery(value, "", true, false)
+	case opcode.LT:
+		query = bluge.NewTermRangeInclusiveQuery("", value, false, false)
+	case opcode.LE:
+		query = bluge.NewTermRangeInclusiveQuery("", value, false, true)
+	}
+	return query.SetField(field)
+}
+
+func makeNumericRangeQuery(field string, value float64, opCode opcode.Op) bluge.Query {
+	var query *bluge.NumericRangeQuery
+	switch opCode {
+	case opcode.GT:
+		query = bluge.NewNumericRangeInclusiveQuery(value, bluge.MaxNumeric, false, false)
+	case opcode.GE:
+		query = bluge.NewNumericRangeInclusiveQuery(value, bluge.MaxNumeric, true, false)
+	case opcode.LT:
+		query = bluge.NewNumericRangeInclusiveQuery(bluge.MinNumeric, value, false, false)
+	case opcode.LE:
+		query = bluge.NewNumericRangeInclusiveQuery(bluge.MinNumeric, value, false, true)
+	}
+	return query.SetField(field)
 }
