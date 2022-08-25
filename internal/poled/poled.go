@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 
-	segment "github.com/blugelabs/bluge_segment_api"
-	"github.com/pingcap/tidb/parser/types"
 	"pole/internal/poled/index"
 	"pole/internal/poled/meta"
 	sqlParser "pole/internal/poled/sql"
 	"pole/internal/util/log"
+
+	segment "github.com/blugelabs/bluge_segment_api"
+	"github.com/pingcap/tidb/parser/types"
 )
 
 type Poled struct {
@@ -74,7 +75,6 @@ func (p *Poled) execSelect(stmt *sqlParser.SqlVistor) *generalResult {
 	if err != nil {
 		return newGeneralResult(err)
 	}
-
 	next, err := iter.Next()
 	for err == nil && next != nil {
 		err = next.VisitStoredFields(func(field string, value []byte) bool {

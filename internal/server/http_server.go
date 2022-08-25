@@ -5,8 +5,9 @@ import (
 	"net"
 	"net/http"
 
-	"github.com/gin-gonic/gin"
 	"pole/internal/poled"
+
+	"github.com/gin-gonic/gin"
 )
 
 type HttpServer struct {
@@ -43,6 +44,10 @@ type SqlReq struct {
 	Query string `form:"query" binding:"required"`
 }
 
+type BadRequestResp struct {
+	Error string `json:"error"`
+}
+
 var (
 	ErrBadRequest = errors.New("bad request")
 )
@@ -50,16 +55,12 @@ var (
 func (s *HttpServer) exec(ctx *gin.Context) {
 	param := &SqlReq{}
 	if err := ctx.ShouldBind(param); err != nil {
-		ctx.JSON(http.StatusBadRequest, ErrBadRequest.Error())
+		ctx.JSON(http.StatusBadRequest, &BadRequestResp{Error: ErrBadRequest.Error()})
 		return
 	}
 
 	rs := s.poled.Exec(param.Query)
-	if rs.Error() != nil {
-		ctx.JSON(http.StatusInternalServerError, rs.Error().Error())
-		return
-	}
-	ctx.JSON(http.StatusOK, rs.Data())
+	ctx.JSON(rs.Code(), rs.Resp())
 }
 
 func (s *HttpServer) Start() error {
