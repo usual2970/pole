@@ -12,6 +12,8 @@ const (
 	DefaultNumericIndexingOptions = bluge.Index | bluge.Store | bluge.Sortable | bluge.Aggregatable
 )
 
+const IdentifierField = "_id"
+
 var (
 	ErrFieldNotFound         = errors.New("field not found")
 	ErrNotSupportedFieldType = errors.New("no supported filed type")

@@ -13,7 +13,6 @@ import (
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/opcode"
 	"github.com/pingcap/tidb/parser/test_driver"
-	_ "github.com/pingcap/tidb/parser/test_driver"
 	"github.com/pingcap/tidb/parser/types"
 )
 
@@ -186,16 +185,6 @@ func (s *SqlVistor) getId() (string, error) {
 	}
 
 	return fmt.Sprintf("%v", value.GetValue()), nil
-}
-
-func getNumericValue(value interface{}) float64 {
-	switch v := value.(type) {
-	case int64:
-		return float64(v)
-	case float64:
-		return v
-	}
-	return 0
 }
 
 func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {

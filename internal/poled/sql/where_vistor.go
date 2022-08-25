@@ -4,12 +4,15 @@ import (
 	"container/list"
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
+
+	"pole/internal/poled/meta"
 
 	"github.com/blugelabs/bluge"
 	"github.com/pingcap/tidb/parser/ast"
 	"github.com/pingcap/tidb/parser/opcode"
 	"github.com/pingcap/tidb/parser/test_driver"
-	"pole/internal/poled/meta"
 )
 
 var (
@@ -19,6 +22,8 @@ var (
 	ErrOrMustBeQuery      = errors.New("or must be query")
 	ErrSyntaxNotSupported = errors.New("syntax not supported")
 )
+
+var wildCardReg = regexp.MustCompile(`%`)
 
 type WhereVisitor struct {
 	prefixQueryNodes *list.List
@@ -82,8 +87,8 @@ func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface
 			if !ok {
 				return nil, ErrSyntaxNotSupported
 			}
-			queries = append(queries, bluge.NewMatchQuery(fmt.Sprintf("%v", value.GetValue())).SetField(columnName(column.Name)))
 
+			queries = append(queries, makeEqQuery(column.Name, value.GetValue(), meta))
 		}
 		if expr.Not {
 			query = bluge.NewBooleanQuery().AddMustNot(queries...)
@@ -100,7 +105,7 @@ func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface
 		if !ok {
 			return nil, ErrEqRightMustBeValue
 		}
-		query = bluge.NewWildcardQuery(fmt.Sprintf("%v", value.GetValue())).SetField(columnName(column))
+		query = bluge.NewWildcardQuery(wildCardReg.ReplaceAllString(fmt.Sprintf("%v", value.GetValue()), "*")).SetField(columnName(column))
 	case *ast.BinaryOperationExpr:
 		switch expr.Op {
 		case opcode.EQ:
@@ -112,7 +117,7 @@ func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface
 			if !ok {
 				return nil, ErrEqRightMustBeValue
 			}
-			query = bluge.NewMatchQuery(fmt.Sprintf("%v", value.GetValue())).SetField(columnName(column))
+			query = makeEqQuery(column, value.GetValue(), meta)
 		case opcode.LogicAnd:
 			query1, ok := node1.(bluge.Query)
 			if !ok {
@@ -144,7 +149,24 @@ func (s *WhereVisitor) buildSingleQuery(node1, node2 interface{}, expr interface
 func columnName(column *ast.ColumnName) string {
 	rs := column.Name.O
 	if rs == "id" {
-		rs = "_id"
+		rs = meta.IdentifierField
 	}
 	return rs
+}
+
+func makeEqQuery(column *ast.ColumnName, value interface{}, m meta.Mapping) bluge.Query {
+	colName := columnName(column)
+	if colName == meta.IdentifierField {
+		return bluge.NewMatchQuery(fmt.Sprintf("%v", value)).SetField(colName)
+	}
+
+	filedOption := m.Properties[colName]
+	switch filedOption.Type {
+	case meta.FieldTypeNumeric:
+		v, _ := strconv.ParseFloat(fmt.Sprintf("%v", value), 64)
+		return bluge.NewNumericRangeInclusiveQuery(v, v, true, true).SetField(colName)
+	case meta.FieldTypeText:
+		return bluge.NewMatchQuery(fmt.Sprintf("%v", value)).SetField(colName)
+	}
+	return nil
 }
