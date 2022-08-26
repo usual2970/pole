@@ -69,6 +69,7 @@ type SqlVistor struct {
 	SelectAll     bool
 	TableName     string
 	offset, limit int
+	orderBy       []string
 }
 
 func (s *SqlVistor) docs(metas meta.Mapping) []*bluge.Document {
@@ -163,6 +164,7 @@ func (s *SqlVistor) BuildRequest(meta meta.Mapping) (bluge.SearchRequest, error)
 	req := bluge.NewTopNSearch(limit, query).WithStandardAggregations().
 		IncludeLocations().
 		SetFrom(offset).
+		SortBy(s.orderBy).
 		ExplainScores()
 	return req, nil
 }
@@ -251,6 +253,20 @@ func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {
 		if ok {
 			s.limit = int(limit.GetValue().(uint64))
 		}
+		return in, true
+	case *ast.OrderByClause:
+		orderBy := make([]string, 0, len(node.Items))
+		for _, item := range node.Items {
+			column := item.Expr.(*ast.ColumnNameExpr).Name.Name.O
+			if column == "id" {
+				column = meta.IdentifierField
+			}
+			if item.Desc {
+				column = fmt.Sprintf("-%s", column)
+			}
+			orderBy = append(orderBy, column)
+		}
+		s.orderBy = orderBy
 		return in, true
 	}
 	return in, false
