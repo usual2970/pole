@@ -31,6 +31,11 @@ var (
 	errDeleteCondition = errors.New("update operation's condition must be pattern 'id=xxx'")
 )
 
+const (
+	defaultOffset = 0
+	defaultLimit  = 10
+)
+
 var parserOnce = sync.Once{}
 var sqlParser *parser.Parser
 
@@ -57,12 +62,13 @@ type Col struct {
 }
 
 type SqlVistor struct {
-	ActionType stmtType
-	ColNames   []Col
-	rows       []interface{}
-	where      ast.Node
-	SelectAll  bool
-	TableName  string
+	ActionType    stmtType
+	ColNames      []Col
+	rows          []interface{}
+	where         ast.Node
+	SelectAll     bool
+	TableName     string
+	offset, limit int
 }
 
 func (s *SqlVistor) docs(metas meta.Mapping) []*bluge.Document {
@@ -152,8 +158,11 @@ func (s *SqlVistor) BuildRequest(meta meta.Mapping) (bluge.SearchRequest, error)
 		}
 	}
 
-	req := bluge.NewTopNSearch(100, query).WithStandardAggregations().
+	offset, limit := s.getPageInfo()
+
+	req := bluge.NewTopNSearch(limit, query).WithStandardAggregations().
 		IncludeLocations().
+		SetFrom(offset).
 		ExplainScores()
 	return req, nil
 }
@@ -233,12 +242,32 @@ func (s *SqlVistor) Enter(in ast.Node) (ast.Node, bool) {
 			})
 		}
 		return in, true
+	case *ast.Limit:
+		offset, ok := node.Offset.(*test_driver.ValueExpr)
+		if ok {
+			s.offset = int(offset.GetValue().(uint64))
+		}
+		limit, ok := node.Count.(*test_driver.ValueExpr)
+		if ok {
+			s.limit = int(limit.GetValue().(uint64))
+		}
+		return in, true
 	}
 	return in, false
 }
 
 func (s *SqlVistor) Leave(in ast.Node) (ast.Node, bool) {
 	return in, true
+}
+
+func (s *SqlVistor) getPageInfo() (int, int) {
+	if s.offset == 0 {
+		s.offset = defaultOffset
+	}
+	if s.limit == 0 {
+		s.limit = defaultLimit
+	}
+	return s.offset, s.limit
 }
 
 func extract(rootNode *ast.StmtNode) *SqlVistor {
