@@ -43,7 +43,7 @@ type Option struct {
 }
 
 type Mapping struct {
-	Properties map[string]FiledOptions
+	Properties map[string]FiledOptions `json:"properties"`
 }
 
 func (m *Mapping) MakeField(name string, value interface{}) (bluge.Field, error) {

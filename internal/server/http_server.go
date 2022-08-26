@@ -64,9 +64,9 @@ func (s *HttpServer) exec(ctx *gin.Context) {
 }
 
 func (s *HttpServer) Start() error {
-	if err := http.Serve(s.listener, s.router); err != nil {
-		return err
-	}
+	go func() {
+		_ = http.Serve(s.listener, s.router)
+	}()
 	return nil
 }
 

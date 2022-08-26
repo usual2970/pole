@@ -51,6 +51,9 @@ var (
 			if err := httpServer.Stop(); err != nil {
 				return err
 			}
+
+			poled.Close()
+
 			return nil
 		},
 	}

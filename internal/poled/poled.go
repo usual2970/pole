@@ -2,6 +2,11 @@ package poled
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"os"
+	"path/filepath"
 
 	"pole/internal/poled/index"
 	"pole/internal/poled/meta"
@@ -13,21 +18,29 @@ import (
 
 type Poled struct {
 	conf    *Config
-	meta    meta.Meta
+	meta    *meta.Meta
 	readers *index.Readers
 	writers *index.Writers
 }
 
 func NewPoled(conf *Config) (*Poled, error) {
 
-	return &Poled{
-		meta: meta.Meta{
+	rs := &Poled{
+		meta: &meta.Meta{
 			MetaData: make(map[string]meta.Mapping),
 		},
 		readers: index.NewReaders(conf.IndexPath),
 		writers: index.NewWriters(),
 		conf:    conf,
-	}, nil
+	}
+	if err := rs.loadMetaData(); err != nil {
+		return nil, err
+	}
+	return rs, nil
+}
+
+func (p *Poled) Close() error {
+	return p.persistentMetaData()
 }
 
 func (p *Poled) Exec(sql string) result {
@@ -207,6 +220,33 @@ func (p *Poled) execDrop(stmt *sqlParser.SqlVistor) result {
 	return newGeneralResult(nil)
 }
 
+func (p *Poled) loadMetaData() error {
+	fn := newMetaDataFile(GetDataPath())
+	raw, err := readOrEmpty(fn)
+	if err != nil {
+		return err
+	}
+	if raw == nil {
+		return nil
+	}
+	data := &meta.Meta{}
+	if err := json.Unmarshal(raw, data); err != nil {
+		return err
+	}
+	p.meta = data
+	return nil
+}
+
+func (p *Poled) persistentMetaData() error {
+	raw, err := json.Marshal(p.meta)
+	if err != nil {
+		return err
+	}
+	fn := newMetaDataFile(GetDataPath())
+
+	return writeSyncFile(fn, raw)
+}
+
 func parseFieldType(columnType types.EvalType) meta.FieldType {
 	if columnType == types.ETString {
 		return meta.FieldTypeText
@@ -217,4 +257,32 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 	}
 
 	return meta.FieldTypeUnknown
+}
+
+func newMetaDataFile(filePath string) string {
+	return filepath.Join(filePath, "pole.dat")
+}
+
+func readOrEmpty(filePath string) ([]byte, error) {
+	rs, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("failed to read metadata from %s - %s", filePath, err)
+		}
+	}
+	return rs, nil
+}
+
+func writeSyncFile(filePath string, data []byte) error {
+	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		return err
+	}
+
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	f.Close()
+	return err
 }
