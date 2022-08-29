@@ -1,6 +1,8 @@
 package index
 
 import (
+	"pole/internal/poled/directory"
+	"pole/internal/util/log"
 	"sync"
 
 	"github.com/blugelabs/bluge"
@@ -13,8 +15,11 @@ type Reader struct {
 	*bluge.Reader
 }
 
-func NewReader(path string) (*Reader, error) {
-	conf := bluge.DefaultConfig(path)
+func NewReader(uri string) (*Reader, error) {
+	conf, err := directory.NewIndexConfigWithUri(uri)
+	if err != nil {
+		return nil, err
+	}
 	reader, err := bluge.OpenReader(conf)
 	if err != nil {
 		return nil, err
@@ -25,15 +30,15 @@ func NewReader(path string) (*Reader, error) {
 }
 
 type Readers struct {
-	Readers   map[string]*Reader
-	indexPath string
+	Readers  map[string]*Reader
+	indexUri string
 	sync.RWMutex
 }
 
-func NewReaders(indexPath string) *Readers {
+func NewReaders(indexUri string) *Readers {
 	return &Readers{
-		Readers:   make(map[string]*Reader),
-		indexPath: indexPath,
+		Readers:  make(map[string]*Reader),
+		indexUri: indexUri,
 	}
 }
 
@@ -45,11 +50,14 @@ func (r *Readers) Get(idx string) (*Reader, bool) {
 		return reader, ok
 	}
 
+	lg := log.WithField("module", "get reader")
+
 	rs, err, _ := sg.Do(idx, func() (interface{}, error) {
-		return NewReader(r.indexPath)
+		return NewReader(r.indexUri)
 	})
 
 	if err != nil {
+		lg.Error(err)
 		return nil, false
 	}
 

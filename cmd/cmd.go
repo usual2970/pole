@@ -44,7 +44,7 @@ var (
 			}
 
 			quitCh := make(chan os.Signal, 1)
-			signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM)
+			signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 
 			<-quitCh
 

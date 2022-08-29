@@ -6,7 +6,7 @@ import (
 
 func mustNewPoled() *Poled {
 	conf := GetConfig()
-	conf.IndexPath = "/var/www/go/pole/tests/indexes"
+	conf.IndexUri = "file:///var/www/go/pole/tests/indexes"
 	pd, err := NewPoled(conf)
 	if err != nil {
 		panic(err)

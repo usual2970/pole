@@ -4,7 +4,7 @@ import "sync"
 
 const (
 	defaultHttpAddr  = ":5000"
-	defaultIndexPath = "/tmp/pole"
+	defaultIndexPath = "file:///tmp/pole"
 	defaultDataPath  = "./"
 )
 
@@ -12,9 +12,9 @@ var confOnce sync.Once
 var conf *Config
 
 type Config struct {
-	IndexPath string `mapstructure:"index_path"`
-	HttpAddr  string `mapstructure:"http_addr"`
-	DataPath  string `mapstructure:"data_path"`
+	IndexUri string `mapstructure:"index_uri"`
+	HttpAddr string `mapstructure:"http_addr"`
+	DataPath string `mapstructure:"data_path"`
 }
 
 func GetConfig() *Config {
@@ -33,7 +33,7 @@ func GetHttpAddr() string {
 }
 
 func GetIndexPath() string {
-	rs := conf.IndexPath
+	rs := conf.IndexUri
 	if rs == "" {
 		rs = defaultIndexPath
 	}

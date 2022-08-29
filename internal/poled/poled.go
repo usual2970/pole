@@ -29,8 +29,8 @@ func NewPoled(conf *Config) (*Poled, error) {
 		meta: &meta.Meta{
 			MetaData: make(map[string]meta.Mapping),
 		},
-		readers: index.NewReaders(conf.IndexPath),
-		writers: index.NewWriters(),
+		readers: index.NewReaders(conf.IndexUri),
+		writers: index.NewWriters(conf.IndexUri),
 		conf:    conf,
 	}
 	if err := rs.loadMetaData(); err != nil {
@@ -183,7 +183,6 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 }
 
 func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
-	lg := log.WithField("module", "create_index")
 	idx := stmt.TableName
 	if p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexExist)
@@ -196,13 +195,9 @@ func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
 		}
 	}
 
-	writer, err := index.NewWriter(p.conf.IndexPath)
-	if err != nil {
-		lg.Error("create index failed:", err)
-		return newGeneralResult(err)
+	if _, ok := p.writers.Get(p.conf.IndexUri); !ok {
+		return newGeneralResult(ErrWriterCreateFailed)
 	}
-
-	p.writers.Add(idx, writer)
 
 	p.meta.Add(idx, fields)
 
