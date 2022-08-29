@@ -8,6 +8,7 @@ require (
 	github.com/blugelabs/bluge_segment_api v0.2.0
 	github.com/fsnotify/fsnotify v1.4.7
 	github.com/gin-gonic/gin v1.8.1
+	github.com/hashicorp/raft v1.3.1
 	github.com/joho/godotenv v1.4.0
 	github.com/pingcap/tidb/parser v0.0.0-20220627062839-d6be9105e6c4
 	github.com/spf13/cobra v0.0.5
@@ -19,6 +20,7 @@ require (
 
 require (
 	github.com/RoaringBitmap/roaring v0.9.4 // indirect
+	github.com/armon/go-metrics v0.0.0-20190430140413-ec5e00d3c878 // indirect
 	github.com/axiomhq/hyperloglog v0.0.0-20191112132149-a4c4c47bc57f // indirect
 	github.com/benbjohnson/clock v1.1.0 // indirect
 	github.com/bits-and-blooms/bitset v1.2.0 // indirect
@@ -37,6 +39,10 @@ require (
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
 	github.com/goccy/go-json v0.9.7 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
+	github.com/hashicorp/go-hclog v0.9.1 // indirect
+	github.com/hashicorp/go-immutable-radix v1.0.0 // indirect
+	github.com/hashicorp/go-msgpack v0.5.5 // indirect
+	github.com/hashicorp/golang-lru v0.5.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
