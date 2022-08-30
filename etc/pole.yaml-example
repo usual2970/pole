@@ -1,0 +1,3 @@
+http_addr: :5000
+index_uri: oss://bucket/path?endpoint=endpoint&access_key_id=access_key_id&access_key_secret=access_key_secret
+data_path: ./
