@@ -1,0 +1,26 @@
+syntax="proto3";
+option go_package = "internal/pb";
+
+service Node {
+    rpc Join(JoinRequest) returns (JoinResponse){}
+    rpc Leave(LeaveRequest) returns (LeaveResponse){}
+}
+
+message JoinRequest{
+    string id =1;
+    string bindAddress=2;
+}
+
+message JoinResponse{
+    int32 code=1;
+    string message=2;
+}
+
+message LeaveRequest{
+    string id =1;
+}
+
+message LeaveResponse{
+    int32 code=1;
+    string message=2;
+}

@@ -36,6 +36,8 @@ func NewHttpServer(address string, poled *poled.Poled) (*HttpServer, error) {
 
 	router.GET("/_sql", s.exec)
 	router.POST("/_sql", s.exec)
+
+	router.GET("/_mapping", s.mapping)
 	s.router = router
 	return s, nil
 }
@@ -61,6 +63,10 @@ func (s *HttpServer) exec(ctx *gin.Context) {
 
 	rs := s.poled.Exec(param.Query)
 	ctx.JSON(rs.Code(), rs.Resp())
+}
+
+func (s *HttpServer) mapping(ctx *gin.Context) {
+	ctx.JSON(http.StatusOK, s.poled.Mapping())
 }
 
 func (s *HttpServer) Start() error {

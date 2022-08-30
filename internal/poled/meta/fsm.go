@@ -21,6 +21,21 @@ type RaftLogData struct {
 	Mapping Mapping   `json:"mapping"`
 }
 
+func NewAddLogDataCmd(index string, mapping Mapping) ([]byte, error) {
+	return json.Marshal(&RaftLogData{
+		Op:      raftLogOpAdd,
+		Index:   index,
+		Mapping: mapping,
+	})
+}
+
+func NewDeleteLogDataCmd(index string) ([]byte, error) {
+	return json.Marshal(&RaftLogData{
+		Op:    raftLogOpDelete,
+		Index: index,
+	})
+}
+
 func (m *Meta) Apply(log *raft.Log) interface{} {
 	logData := &RaftLogData{}
 	if err := json.Unmarshal(log.Data, logData); err != nil {

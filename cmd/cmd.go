@@ -7,6 +7,8 @@ import (
 	"syscall"
 
 	poled2 "pole/internal/poled"
+	"pole/internal/poled/meta"
+	"pole/internal/raft"
 	"pole/internal/server"
 
 	"github.com/fsnotify/fsnotify"
@@ -21,8 +23,13 @@ const (
 
 var (
 	// Used for flags.
-	cfgFile string
-	envFile string
+	cfgFile       string
+	envFile       string
+	raftId        string
+	raftAddress   string
+	raftBootstrap bool
+	raftDataDir   string
+	join          string
 
 	poleCmd = &cobra.Command{
 		Use:   "pole",
@@ -30,11 +37,35 @@ var (
 		Long:  `A full text Search engine that use sql to create,update,query,delete index data`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 
-			conf := poled2.GetConfig()
-			poled, err := poled2.NewPoled(conf)
+			meta := meta.NewMeta()
+
+			raft, err := raft.NewRaft(raftId, raftAddress, raftDataDir, join, raftBootstrap, meta)
 			if err != nil {
 				return err
 			}
+			conf := poled2.GetConfig()
+
+			poled2.SetJoin(join)
+
+			poled, err := poled2.NewPoled(conf, meta, raft)
+			if err != nil {
+				return err
+			}
+			raft.State()
+
+			grpcService := server.NewNodeService(raft)
+
+			poleService := server.NewPoleService(poled)
+
+			grpcServer, err := server.NewGrpcServer(grpcService, poleService)
+			if err != nil {
+				return err
+			}
+
+			if err := grpcServer.Start(); err != nil {
+				return err
+			}
+
 			httpServer, err := server.NewHttpServer(poled2.GetHttpAddr(), poled)
 			if err != nil {
 				return err
@@ -44,14 +75,15 @@ var (
 			}
 
 			quitCh := make(chan os.Signal, 1)
-			signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+			signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM)
 
 			<-quitCh
+
+			grpcServer.Stop()
 
 			if err := httpServer.Stop(); err != nil {
 				return err
 			}
-
 			poled.Close()
 
 			return nil
@@ -71,8 +103,13 @@ func Execute() error {
 func init() {
 	cobra.OnInitialize(initConfig)
 
-	poleCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.cobra.yaml)")
-	poleCmd.PersistentFlags().StringVar(&envFile, "envFile", defaultEnvFile, "environment file")
+	poleCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/pole.yaml)")
+	poleCmd.PersistentFlags().StringVar(&envFile, "env", defaultEnvFile, "environment file")
+	poleCmd.PersistentFlags().StringVar(&raftId, "raft-id", "", "raft id")
+	poleCmd.PersistentFlags().StringVar(&raftAddress, "raft-addr", "", "raft address")
+	poleCmd.PersistentFlags().StringVar(&raftDataDir, "raft-data-dir", "./", "raft data directory")
+	poleCmd.PersistentFlags().BoolVar(&raftBootstrap, "raft-bootstrap", false, "raft bootstrap")
+	poleCmd.PersistentFlags().StringVar(&join, "join", "", "join the cluster")
 }
 
 func initConfig() {
@@ -100,6 +137,7 @@ func initConfig() {
 	}
 
 	viper.AutomaticEnv()
+	viper.SetEnvPrefix("POLE")
 
 	if err := viper.ReadInConfig(); err == nil {
 		fmt.Println("Using config file:", viper.ConfigFileUsed())

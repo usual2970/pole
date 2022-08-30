@@ -1,0 +1,16 @@
+syntax="proto3";
+option go_package = "internal/pb";
+
+
+service Pole {
+    rpc Exec(ExecRequest) returns (ExecResponse){};
+}
+
+message ExecRequest{
+    string sql =1;
+}
+
+message ExecResponse{
+    int32 code =1;
+    string message =2;
+}

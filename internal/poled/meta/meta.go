@@ -9,6 +9,12 @@ type Meta struct {
 	sync.RWMutex
 }
 
+func NewMeta() *Meta {
+	return &Meta{
+		MetaData: make(map[string]Mapping),
+	}
+}
+
 func (m *Meta) Exists(index string) bool {
 	m.RLock()
 	defer m.RUnlock()

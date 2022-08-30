@@ -2,17 +2,16 @@ package poled
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
-	"io/ioutil"
-	"os"
-	"path/filepath"
+	"time"
 
+	"pole/internal/pb"
 	"pole/internal/poled/index"
 	"pole/internal/poled/meta"
 	sqlParser "pole/internal/poled/sql"
+	poleRaft "pole/internal/raft"
 	"pole/internal/util/log"
 
+	"github.com/hashicorp/raft"
 	"github.com/pingcap/tidb/parser/types"
 )
 
@@ -21,26 +20,27 @@ type Poled struct {
 	meta    *meta.Meta
 	readers *index.Readers
 	writers *index.Writers
+	raft    *raft.Raft
 }
 
-func NewPoled(conf *Config) (*Poled, error) {
+func NewPoled(conf *Config, meta *meta.Meta, raft *raft.Raft) (*Poled, error) {
 
 	rs := &Poled{
-		meta: &meta.Meta{
-			MetaData: make(map[string]meta.Mapping),
-		},
+		meta:    meta,
 		readers: index.NewReaders(conf.IndexUri),
 		writers: index.NewWriters(conf.IndexUri),
 		conf:    conf,
-	}
-	if err := rs.loadMetaData(); err != nil {
-		return nil, err
+		raft:    raft,
 	}
 	return rs, nil
 }
 
 func (p *Poled) Close() error {
-	return p.persistentMetaData()
+	return nil
+}
+
+func (p *Poled) Mapping() map[string]meta.Mapping {
+	return p.meta.All()
 }
 
 func (p *Poled) Exec(sql string) result {
@@ -51,9 +51,9 @@ func (p *Poled) Exec(sql string) result {
 
 	switch stmt.ActionType {
 	case sqlParser.StmtTypeCreate:
-		return p.execCreate(stmt)
+		return p.execCreate(sql, stmt)
 	case sqlParser.StmtTypeDrop:
-		return p.execDrop(stmt)
+		return p.execDrop(sql, stmt)
 	case sqlParser.StmtTypeInsert:
 		return p.execInsert(stmt)
 	case sqlParser.StmtTypeDelete:
@@ -182,7 +182,25 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 	return newGeneralResult(nil)
 }
 
-func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
+func (p *Poled) execByRpc(sql string) result {
+	client, err := poleRaft.GetClientConn(conf.Join)
+	if err != nil {
+		return newGeneralResult(err)
+	}
+
+	cc := pb.NewPoleClient(client)
+
+	if _, err := cc.Exec(context.Background(), &pb.ExecRequest{Sql: sql}); err != nil {
+		return newGeneralResult(err)
+	}
+	return newGeneralResult(nil)
+}
+
+func (p *Poled) execCreate(sql string, stmt *sqlParser.SqlVistor) result {
+	if p.raft.State() != raft.Leader {
+		return p.execByRpc(sql)
+	}
+
 	idx := stmt.TableName
 	if p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexExist)
@@ -199,47 +217,30 @@ func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
 		return newGeneralResult(ErrWriterCreateFailed)
 	}
 
-	p.meta.Add(idx, fields)
+	cmd, err := meta.NewAddLogDataCmd(idx, fields)
+	if err != nil {
+		return newGeneralResult(err)
+	}
+
+	p.raft.Apply(cmd, time.Second)
 
 	return newGeneralResult(nil)
 }
 
-func (p *Poled) execDrop(stmt *sqlParser.SqlVistor) result {
+func (p *Poled) execDrop(sql string, stmt *sqlParser.SqlVistor) result {
 	idx := stmt.TableName
 	if !p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexNotFound)
 	}
-	p.meta.Delete(idx)
+
+	cmd, err := meta.NewDeleteLogDataCmd(idx)
+	if err != nil {
+		return newGeneralResult(err)
+	}
+	p.raft.Apply(cmd, time.Second)
 	p.readers.Delete(idx)
 	p.writers.Delete(idx)
 	return newGeneralResult(nil)
-}
-
-func (p *Poled) loadMetaData() error {
-	fn := newMetaDataFile(GetDataPath())
-	raw, err := readOrEmpty(fn)
-	if err != nil {
-		return err
-	}
-	if raw == nil {
-		return nil
-	}
-	data := &meta.Meta{}
-	if err := json.Unmarshal(raw, data); err != nil {
-		return err
-	}
-	p.meta = data
-	return nil
-}
-
-func (p *Poled) persistentMetaData() error {
-	raw, err := json.Marshal(p.meta)
-	if err != nil {
-		return err
-	}
-	fn := newMetaDataFile(GetDataPath())
-
-	return writeSyncFile(fn, raw)
 }
 
 func parseFieldType(columnType types.EvalType) meta.FieldType {
@@ -252,32 +253,4 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 	}
 
 	return meta.FieldTypeUnknown
-}
-
-func newMetaDataFile(filePath string) string {
-	return filepath.Join(filePath, "pole.dat")
-}
-
-func readOrEmpty(filePath string) ([]byte, error) {
-	rs, err := ioutil.ReadFile(filePath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return nil, fmt.Errorf("failed to read metadata from %s - %s", filePath, err)
-		}
-	}
-	return rs, nil
-}
-
-func writeSyncFile(filePath string, data []byte) error {
-	f, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	if err != nil {
-		return err
-	}
-
-	_, err = f.Write(data)
-	if err == nil {
-		err = f.Sync()
-	}
-	f.Close()
-	return err
 }

@@ -4,6 +4,7 @@ import "sync"
 
 const (
 	defaultHttpAddr  = ":5000"
+	defaultGrpcAddr  = ":5001"
 	defaultIndexPath = "file:///tmp/pole"
 	defaultDataPath  = "./"
 )
@@ -11,10 +12,20 @@ const (
 var confOnce sync.Once
 var conf *Config
 
+type RaftConfig struct {
+	Id        string `mapstructure:"id"`
+	BootStrap bool   `mapstructure:"bootstrap"`
+	Address   string `mapstructure:"address"`
+	DataDir   string `mapstructure:"data_dir"`
+}
+
 type Config struct {
-	IndexUri string `mapstructure:"index_uri"`
-	HttpAddr string `mapstructure:"http_addr"`
-	DataPath string `mapstructure:"data_path"`
+	IndexUri string     `mapstructure:"index_uri"`
+	HttpAddr string     `mapstructure:"http_addr"`
+	GrpcAddr string     `mapstructure:"grpc_addr"`
+	DataPath string     `mapstructure:"data_path"`
+	Raft     RaftConfig `mapstructure:"raft"`
+	Join     string     `mapstructure:"join"`
 }
 
 func GetConfig() *Config {
@@ -28,6 +39,14 @@ func GetHttpAddr() string {
 	rs := conf.HttpAddr
 	if rs == "" {
 		rs = defaultHttpAddr
+	}
+	return rs
+}
+
+func GetGrpcAddr() string {
+	rs := conf.GrpcAddr
+	if rs == "" {
+		rs = defaultGrpcAddr
 	}
 	return rs
 }
@@ -46,4 +65,8 @@ func GetDataPath() string {
 		rs = defaultDataPath
 	}
 	return rs
+}
+
+func SetJoin(join string) {
+	conf.Join = join
 }
