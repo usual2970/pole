@@ -1,14 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"pole/internal/conf"
 	poled2 "pole/internal/poled"
 	"pole/internal/poled/meta"
-	"pole/internal/raft"
+	poleRaft "pole/internal/raft"
 	"pole/internal/server"
 
 	"github.com/fsnotify/fsnotify"
@@ -38,22 +40,19 @@ var (
 		RunE: func(cmd *cobra.Command, args []string) error {
 
 			meta := meta.NewMeta()
-
-			raft, err := raft.NewRaft(raftId, raftAddress, raftDataDir, join, raftBootstrap, meta)
+			ctx := context.Background()
+			raft, err := poleRaft.NewRaft(ctx, raftId, raftAddress, raftDataDir, join, raftBootstrap, meta)
 			if err != nil {
 				return err
 			}
-			conf := poled2.GetConfig()
+			conf := conf.GetConfig()
 
-			poled2.SetJoin(join)
-
-			poled, err := poled2.NewPoled(conf, meta, raft)
+			poled, err := poled2.NewPoled(conf, meta, raft.Raft)
 			if err != nil {
 				return err
 			}
-			raft.State()
 
-			grpcService := server.NewNodeService(raft)
+			grpcService := server.NewNodeService(raft.Raft)
 
 			poleService := server.NewPoleService(poled)
 
@@ -66,7 +65,7 @@ var (
 				return err
 			}
 
-			httpServer, err := server.NewHttpServer(poled2.GetHttpAddr(), poled)
+			httpServer, err := server.NewHttpServer(conf.HttpAddr, poled)
 			if err != nil {
 				return err
 			}
@@ -78,6 +77,8 @@ var (
 			signal.Notify(quitCh, syscall.SIGINT, syscall.SIGTERM)
 
 			<-quitCh
+
+			raft.Stop(ctx)
 
 			grpcServer.Stop()
 
@@ -145,7 +146,7 @@ func initConfig() {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	conf := poled2.GetConfig()
+	conf := conf.GetConfig()
 	if err := viper.Unmarshal(conf); err != nil {
 		_, _ = fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

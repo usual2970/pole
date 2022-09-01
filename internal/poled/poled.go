@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"pole/internal/conf"
 	"pole/internal/pb"
 	"pole/internal/poled/index"
 	"pole/internal/poled/meta"
@@ -16,14 +17,14 @@ import (
 )
 
 type Poled struct {
-	conf    *Config
+	conf    *conf.Config
 	meta    *meta.Meta
 	readers *index.Readers
 	writers *index.Writers
 	raft    *raft.Raft
 }
 
-func NewPoled(conf *Config, meta *meta.Meta, raft *raft.Raft) (*Poled, error) {
+func NewPoled(conf *conf.Config, meta *meta.Meta, raft *raft.Raft) (*Poled, error) {
 
 	rs := &Poled{
 		meta:    meta,
@@ -183,7 +184,7 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 }
 
 func (p *Poled) execByRpc(sql string) result {
-	client, err := poleRaft.GetClientConn(conf.Join)
+	client, err := poleRaft.GetClientConn(p.meta.Leader())
 	if err != nil {
 		return newGeneralResult(err)
 	}
@@ -200,7 +201,6 @@ func (p *Poled) execCreate(sql string, stmt *sqlParser.SqlVistor) result {
 	if p.raft.State() != raft.Leader {
 		return p.execByRpc(sql)
 	}
-
 	idx := stmt.TableName
 	if p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexExist)
@@ -228,6 +228,9 @@ func (p *Poled) execCreate(sql string, stmt *sqlParser.SqlVistor) result {
 }
 
 func (p *Poled) execDrop(sql string, stmt *sqlParser.SqlVistor) result {
+	if p.raft.State() != raft.Leader {
+		return p.execByRpc(sql)
+	}
 	idx := stmt.TableName
 	if !p.meta.Exists(idx) {
 		return newGeneralResult(ErrIndexNotFound)

@@ -3,8 +3,8 @@ package server
 import (
 	"math"
 	"net"
+	"pole/internal/conf"
 	"pole/internal/pb"
-	"pole/internal/poled"
 	"pole/internal/util/log"
 	"time"
 
@@ -49,7 +49,7 @@ func NewGrpcServer(nodeService *NodeService, poleService *PoleService) (*GrpcSer
 	pb.RegisterNodeServer(grpcServer, nodeService)
 	pb.RegisterPoleServer(grpcServer, poleService)
 
-	listener, err := net.Listen("tcp", poled.GetGrpcAddr())
+	listener, err := net.Listen("tcp", conf.GetGrpcAddr())
 	if err != nil {
 		return nil, err
 	}

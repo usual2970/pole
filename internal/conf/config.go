@@ -1,4 +1,4 @@
-package poled
+package conf
 
 import "sync"
 

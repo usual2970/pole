@@ -1,13 +1,15 @@
 package poled
 
 import (
+	"pole/internal/conf"
+	"pole/internal/poled/meta"
 	"testing"
 )
 
 func mustNewPoled() *Poled {
-	conf := GetConfig()
+	conf := conf.GetConfig()
 	conf.IndexUri = "file:///var/www/go/pole/tests/indexes"
-	pd, err := NewPoled(conf)
+	pd, err := NewPoled(conf, &meta.Meta{}, nil)
 	if err != nil {
 		panic(err)
 	}

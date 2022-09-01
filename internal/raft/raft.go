@@ -5,14 +5,25 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"pole/internal/conf"
 	"pole/internal/pb"
+	"pole/internal/poled/meta"
+	"pole/internal/util/log"
 	"time"
 
 	"github.com/hashicorp/raft"
 	boltdb "github.com/hashicorp/raft-boltdb"
 )
 
-func NewRaft(myID, myAddress, raftDir, join string, bootstrap bool, fsm raft.FSM) (*raft.Raft, error) {
+type raftNode struct {
+	cancel context.CancelFunc
+	Raft   *raft.Raft
+	id     string
+	meta   *meta.Meta
+}
+
+func NewRaft(ctx context.Context, myID, myAddress, raftDir, join string, bootstrap bool, fsm *meta.Meta) (*raftNode, error) {
+	lg := log.WithField("module", "initRaft")
 	c := raft.DefaultConfig()
 	c.LocalID = raft.ServerID(myID)
 
@@ -66,10 +77,47 @@ func NewRaft(myID, myAddress, raftDir, join string, bootstrap bool, fsm raft.FSM
 		}
 		cc := pb.NewNodeClient(client)
 
-		if _, err := cc.Join(context.Background(), &pb.JoinRequest{Id: myID, BindAddress: myAddress}); err != nil {
-			return nil, fmt.Errorf("raft.Raft.Join: %v", err)
+		if _, err := cc.Join(ctx, &pb.JoinRequest{Id: myID, BindAddress: myAddress}); err != nil {
+			lg.Error("raft.Raft.Join: ", err)
 		}
 	}
 
-	return r, nil
+	ctx, cancel := context.WithCancel(ctx)
+	node := &raftNode{Raft: r, cancel: cancel, id: myID, meta: fsm}
+
+	go func() {
+		node.process(ctx)
+	}()
+	return node, nil
+}
+
+func (n *raftNode) process(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case isLearder := <-n.Raft.LeaderCh():
+			if isLearder {
+				cmd, _ := meta.NewBecomeLeaderCmd(conf.GetGrpcAddr())
+				n.Raft.Apply(cmd, 1*time.Second)
+			}
+		}
+	}
+}
+
+func (n *raftNode) Stop(ctx context.Context) error {
+	if n.Raft.State() != raft.Leader {
+		client, err := GetClientConn(n.meta.Leader())
+		if err != nil {
+			return fmt.Errorf("raft.Raft.GetClient: %v", err)
+		}
+		cc := pb.NewNodeClient(client)
+
+		if _, err := cc.Leave(ctx, &pb.LeaveRequest{Id: n.id}); err != nil {
+			return fmt.Errorf("raft.Raft.Leave: %v", err)
+		}
+	}
+
+	n.cancel()
+	return nil
 }
