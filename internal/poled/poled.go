@@ -184,6 +184,8 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 }
 
 func (p *Poled) execByRpc(sql string) result {
+	lg := log.WithField("module", "execByRpc").WithField("state", p.raft.State().String()).WithField("leaderGrpcAddr", p.meta.Leader())
+
 	client, err := poleRaft.GetClientConn(p.meta.Leader())
 	if err != nil {
 		return newGeneralResult(err)
@@ -192,8 +194,10 @@ func (p *Poled) execByRpc(sql string) result {
 	cc := pb.NewPoleClient(client)
 
 	if _, err := cc.Exec(context.Background(), &pb.ExecRequest{Sql: sql}); err != nil {
+		lg.Error("failed to execute ,err: ", err)
 		return newGeneralResult(err)
 	}
+	lg.Info("exec success")
 	return newGeneralResult(nil)
 }
 

@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 
 	"github.com/hashicorp/raft"
+
+	poleLog "pole/internal/util/log"
 )
 
 type raftLogOp int
@@ -21,6 +23,11 @@ type RaftLogData struct {
 	Index          string    `json:"index"`
 	Mapping        Mapping   `json:"mapping"`
 	LeaderGrpcAddr string    `json:"leaderGrpcAddr"`
+}
+
+func (l *RaftLogData) String() string {
+	rs, _ := json.Marshal(l)
+	return string(rs)
 }
 
 func NewAddLogDataCmd(index string, mapping Mapping) ([]byte, error) {
@@ -45,10 +52,12 @@ func NewBecomeLeaderCmd(leaderGrpcAddr string) ([]byte, error) {
 }
 
 func (m *Meta) Apply(log *raft.Log) interface{} {
+	lg := poleLog.WithField("module", "raftApply")
 	logData := &RaftLogData{}
 	if err := json.Unmarshal(log.Data, logData); err != nil {
 		return nil
 	}
+	lg = lg.WithField("cmd", logData.String())
 
 	switch logData.Op {
 	case raftLogOpAdd:
@@ -57,8 +66,9 @@ func (m *Meta) Apply(log *raft.Log) interface{} {
 		m.Delete(logData.Index)
 	case raftLogLeaderChange:
 		m.UpdateLeader(logData.LeaderGrpcAddr)
-	}
 
+	}
+	lg.Info("appply success")
 	return nil
 }
 

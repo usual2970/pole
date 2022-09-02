@@ -92,6 +92,7 @@ func NewRaft(ctx context.Context, myID, myAddress, raftDir, join string, bootstr
 }
 
 func (n *raftNode) process(ctx context.Context) {
+	lg := log.WithField("module", "raftProcess")
 	for {
 		select {
 		case <-ctx.Done():
@@ -100,6 +101,7 @@ func (n *raftNode) process(ctx context.Context) {
 			if isLearder {
 				cmd, _ := meta.NewBecomeLeaderCmd(conf.GetGrpcAddr())
 				n.Raft.Apply(cmd, 1*time.Second)
+				lg.Info("become leader")
 			}
 		}
 	}

@@ -7,6 +7,7 @@ import (
 
 	"pole/internal/poled"
 
+	"github.com/gin-contrib/pprof"
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,6 +39,7 @@ func NewHttpServer(address string, poled *poled.Poled) (*HttpServer, error) {
 	router.POST("/_sql", s.exec)
 
 	router.GET("/_mapping", s.mapping)
+	pprof.Register(router)
 	s.router = router
 	return s, nil
 }

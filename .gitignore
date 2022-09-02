@@ -5,5 +5,7 @@ pole
 __debug_bin
 .vscode
 etc/pole.yaml
+etc/pole1.yaml
+etc/pole2.yaml
 pole.dat
 data
