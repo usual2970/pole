@@ -2,6 +2,7 @@ package poled
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"pole/internal/conf"
@@ -264,6 +265,9 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 }
 
 func (p *Poled) Lock() error {
+	if p.raft.State() != raft.Leader {
+		return p.lockByGrpc()
+	}
 	if p.meta.IsDlocked() {
 		return meta.ErrAlreadyLocked
 	}
@@ -283,6 +287,9 @@ func (p *Poled) Lock() error {
 }
 
 func (p *Poled) Unlock() error {
+	if p.raft.State() != raft.Leader {
+		return p.unlockByGrpc()
+	}
 	if !p.meta.IsDlocked() {
 		return meta.ErrAlreadyUnlocked
 	}
@@ -298,5 +305,41 @@ func (p *Poled) Unlock() error {
 		return err
 	}
 
+	return nil
+}
+
+func (p *Poled) lockByGrpc() error {
+	client, err := poleRaft.GetClientConn(p.meta.Leader())
+	if err != nil {
+		return err
+	}
+
+	cc := pb.NewPoleClient(client)
+
+	rs, err := cc.Lock(context.Background(), &pb.LockRequest{})
+	if err != nil {
+		return err
+	}
+	if rs.Code != 0 {
+		return fmt.Errorf("lock failed: %s", rs.Message)
+	}
+	return nil
+}
+
+func (p *Poled) unlockByGrpc() error {
+	client, err := poleRaft.GetClientConn(p.meta.Leader())
+	if err != nil {
+		return err
+	}
+
+	cc := pb.NewPoleClient(client)
+
+	rs, err := cc.Unlock(context.Background(), &pb.UnlockRequest{})
+	if err != nil {
+		return err
+	}
+	if rs.Code != 0 {
+		return fmt.Errorf("lock failed: %s", rs.Message)
+	}
 	return nil
 }

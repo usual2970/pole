@@ -24,3 +24,17 @@ func (s *PoleService) Exec(ctx context.Context, req *pb.ExecRequest) (*pb.ExecRe
 	}
 	return &pb.ExecResponse{Message: "success"}, nil
 }
+
+func (s *PoleService) Lock(ctx context.Context, req *pb.LockRequest) (*pb.LockResponse, error) {
+	if err := s.poled.Lock(); err != nil {
+		return nil, err
+	}
+	return &pb.LockResponse{Message: "success"}, nil
+}
+
+func (s *PoleService) Unlock(ctx context.Context, req *pb.UnlockRequest) (*pb.UnlockResponse, error) {
+	if err := s.poled.Unlock(); err != nil {
+		return nil, err
+	}
+	return &pb.UnlockResponse{Message: "success"}, nil
+}
