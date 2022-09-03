@@ -10,3 +10,4 @@ etc/pole2.yaml
 pole.dat
 data
 __debug_bin.exe
+protoc.exe

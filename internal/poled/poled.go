@@ -264,9 +264,39 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 }
 
 func (p *Poled) Lock() error {
+	if p.meta.IsDlocked() {
+		return meta.ErrAlreadyLocked
+	}
+	cmd, _ := meta.NewLockCmd()
+	af := p.raft.Apply(cmd, time.Millisecond*200)
+
+	if af.Error() != nil {
+		return af.Error()
+	}
+
+	rs := af.Response()
+	if err, ok := rs.(error); ok {
+		return err
+	}
+
 	return nil
 }
 
 func (p *Poled) Unlock() error {
+	if !p.meta.IsDlocked() {
+		return meta.ErrAlreadyUnlocked
+	}
+	cmd, _ := meta.NewUnLockCmd()
+	af := p.raft.Apply(cmd, time.Millisecond*200)
+
+	if af.Error() != nil {
+		return af.Error()
+	}
+
+	rs := af.Response()
+	if err, ok := rs.(error); ok {
+		return err
+	}
+
 	return nil
 }

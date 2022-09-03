@@ -4,7 +4,21 @@ option go_package = "internal/pb";
 
 service Pole {
     rpc Exec(ExecRequest) returns (ExecResponse){};
+    rpc Lock(LockRequest) returns (LockResponse){};
+    rpc Unlock(UnlockRequest) returns (UnlockResponse){};
 }
+
+message LockRequest{}
+message LockResponse{
+    int32 code =1;
+    string message =2;
+}
+message UnlockRequest{}
+message UnlockResponse{
+    int32 code =1;
+    string message =2;
+}
+
 
 message ExecRequest{
     string sql =1;

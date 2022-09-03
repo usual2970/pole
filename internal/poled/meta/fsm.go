@@ -2,6 +2,7 @@ package meta
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"io/ioutil"
 
@@ -10,12 +11,19 @@ import (
 	poleLog "pole/internal/util/log"
 )
 
+var (
+	ErrAlreadyLocked   = errors.New("already-locked")
+	ErrAlreadyUnlocked = errors.New("already-unlocked")
+)
+
 type raftLogOp int
 
 const (
 	raftLogOpAdd raftLogOp = iota
 	raftLogOpDelete
 	raftLogLeaderChange
+	raftLogLock
+	raftLogUnlock
 )
 
 type RaftLogData struct {
@@ -51,6 +59,18 @@ func NewBecomeLeaderCmd(leaderGrpcAddr string) ([]byte, error) {
 	})
 }
 
+func NewLockCmd() ([]byte, error) {
+	return json.Marshal(&RaftLogData{
+		Op: raftLogLock,
+	})
+}
+
+func NewUnLockCmd() ([]byte, error) {
+	return json.Marshal(&RaftLogData{
+		Op: raftLogUnlock,
+	})
+}
+
 func (m *Meta) Apply(log *raft.Log) interface{} {
 	lg := poleLog.WithField("module", "raftApply")
 	logData := &RaftLogData{}
@@ -66,6 +86,10 @@ func (m *Meta) Apply(log *raft.Log) interface{} {
 		m.Delete(logData.Index)
 	case raftLogLeaderChange:
 		m.UpdateLeader(logData.LeaderGrpcAddr)
+	case raftLogLock:
+		return m.DLock()
+	case raftLogUnlock:
+		return m.DUnlock()
 
 	}
 	lg.Info("appply success")
@@ -106,4 +130,42 @@ func (m *Meta) Leader() string {
 	m.RLock()
 	defer m.RUnlock()
 	return m.LeaderGrpcAddr
+}
+
+func (m *Meta) DLock() error {
+	m.RLock()
+	locked := m.dlocked()
+	m.RUnlock()
+
+	if locked {
+		return ErrAlreadyLocked
+	}
+
+	m.Lock()
+	defer m.Unlock()
+	m.DLocked = true
+	return nil
+}
+
+func (m *Meta) DUnlock() error {
+	m.RLock()
+	locked := m.dlocked()
+	m.RUnlock()
+	if !locked {
+		return ErrAlreadyUnlocked
+	}
+	m.Lock()
+	defer m.Unlock()
+	m.DLocked = false
+	return nil
+}
+
+func (m *Meta) IsDlocked() bool {
+	m.RLock()
+	defer m.RUnlock()
+	return m.dlocked()
+}
+
+func (m *Meta) dlocked() bool {
+	return m.DLocked
 }

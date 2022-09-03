@@ -7,6 +7,7 @@ import (
 type Meta struct {
 	MetaData       map[string]Mapping `json:"metaData"`
 	LeaderGrpcAddr string             `json:"leaderGrpcAddr"`
+	DLocked          bool               `json:"dlock"`
 	sync.RWMutex
 }
 
