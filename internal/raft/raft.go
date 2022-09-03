@@ -46,7 +46,7 @@ func NewRaft(ctx context.Context, myID, myAddress, raftDir, join string, bootstr
 
 	trans, err := raft.NewTCPTransport(myAddress, nil, 3, 5*time.Second, os.Stdout)
 	if err != nil {
-		return nil, fmt.Errorf(`raft.NewTCPTransport(%q, ...): %v`, baseDir, err)
+		return nil, fmt.Errorf(`raft.NewTCPTransport(%q, ...): %v`, myAddress, err)
 	}
 
 	r, err := raft.NewRaft(c, fsm, ldb, sdb, fss, trans)

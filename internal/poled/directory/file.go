@@ -9,9 +9,9 @@ import (
 	"github.com/blugelabs/bluge/index"
 )
 
-func FileIndexConfig(uri string, logger *log.ZapLogger) bluge.Config {
+func FileIndexConfig(opts *IndexConfigArgs) bluge.Config {
 	return bluge.DefaultConfigWithDirectory(func() index.Directory {
-		return NewFileDirectoryWithUri(uri, logger)
+		return NewFileDirectoryWithUri(opts.Uri, opts.Logger)
 	})
 }
 

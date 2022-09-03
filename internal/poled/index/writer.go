@@ -15,8 +15,8 @@ type Writer struct {
 	*bluge.Writer
 }
 
-func NewWriter(uri string) (*Writer, error) {
-	conf, err := directory.NewIndexConfigWithUri(uri)
+func NewWriter(uri string, lock directory.Lock) (*Writer, error) {
+	conf, err := directory.NewIndexConfigWithUri(uri, directory.WithLock(lock))
 	if err != nil {
 		return nil, err
 	}
@@ -33,12 +33,14 @@ type Writers struct {
 	Writers  map[string]*Writer
 	indexUri string
 	sync.RWMutex
+	lock directory.Lock
 }
 
-func NewWriters(indexUri string) *Writers {
+func NewWriters(indexUri string, lock directory.Lock) *Writers {
 	return &Writers{
 		indexUri: indexUri,
 		Writers:  make(map[string]*Writer),
+		lock:     lock,
 	}
 }
 
@@ -64,7 +66,7 @@ func (w *Writers) Get(idx string) (*Writer, bool) {
 	lg := log.WithField("module", "get writer")
 
 	rs, err, _ := wsg.Do(idx, func() (interface{}, error) {
-		return NewWriter(w.indexUri)
+		return NewWriter(w.indexUri, w.lock)
 	})
 
 	if err != nil {

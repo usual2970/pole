@@ -27,12 +27,13 @@ type Poled struct {
 func NewPoled(conf *conf.Config, meta *meta.Meta, raft *raft.Raft) (*Poled, error) {
 
 	rs := &Poled{
-		meta:    meta,
-		readers: index.NewReaders(conf.IndexUri),
-		writers: index.NewWriters(conf.IndexUri),
-		conf:    conf,
-		raft:    raft,
+		meta: meta,
+		conf: conf,
+		raft: raft,
 	}
+
+	rs.readers = index.NewReaders(conf.IndexUri, rs)
+	rs.writers = index.NewWriters(conf.IndexUri, rs)
 	return rs, nil
 }
 
@@ -260,4 +261,12 @@ func parseFieldType(columnType types.EvalType) meta.FieldType {
 	}
 
 	return meta.FieldTypeUnknown
+}
+
+func (p *Poled) Lock() error {
+	return nil
+}
+
+func (p *Poled) Unlock() error {
+	return nil
 }

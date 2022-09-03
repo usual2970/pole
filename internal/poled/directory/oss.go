@@ -24,9 +24,9 @@ import (
 	"go.uber.org/zap"
 )
 
-func OssIndexConfig(uri string, lockUri string, logger *log.ZapLogger) bluge.Config {
+func OssIndexConfig(args *IndexConfigArgs) bluge.Config {
 	return bluge.DefaultConfigWithDirectory(func() index.Directory {
-		return NewOssDirectoryWithUri(uri, lockUri, logger)
+		return NewOssDirectoryWithUri(args)
 	})
 }
 
@@ -37,28 +37,28 @@ type OssDirectory struct {
 	client         *oss.Client
 	ctx            context.Context
 	requestTimeout time.Duration
-	lockUri        string
+	lock           Lock
 	logger         *log.ZapLogger
 }
 
-func NewOssDirectoryWithUri(uri string, lockUri string, logger *log.ZapLogger) *OssDirectory {
-	directoryLogger := logger.WithField("schemeType", "oss")
+func NewOssDirectoryWithUri(opts *IndexConfigArgs) *OssDirectory {
+	directoryLogger := opts.Logger.WithField("schemeType", "oss")
 
-	client, err := clients.NewOssClientWithUri(uri)
+	client, err := clients.NewOssClientWithUri(opts.Uri)
 	if err != nil {
-		logger.Error(err.Error(), zap.String("uri", uri))
+		opts.Logger.Error(err.Error(), zap.String("uri", opts.Uri))
 		return nil
 	}
 
 	// Parse URI.
-	u, err := url.Parse(uri)
+	u, err := url.Parse(opts.Uri)
 	if err != nil {
-		logger.Error(err.Error(), zap.String("uri", uri))
+		opts.Logger.Error(err.Error(), zap.String("uri", opts.Uri))
 		return nil
 	}
 	if u.Scheme != SchemeType_name[SchemeTypeOss] {
 		err := errors.ErrInvalidUri
-		logger.Error(err.Error(), zap.String("uri", uri))
+		opts.Logger.Error(err.Error(), zap.String("uri", opts.Uri))
 		return nil
 	}
 
@@ -68,7 +68,7 @@ func NewOssDirectoryWithUri(uri string, lockUri string, logger *log.ZapLogger) *
 		path:           u.Path,
 		ctx:            context.Background(),
 		requestTimeout: 3 * time.Second,
-		lockUri:        lockUri,
+		lock:           opts.Lock,
 
 		logger: directoryLogger,
 	}
@@ -137,9 +137,15 @@ func (d *OssDirectory) fileName(kind string, id uint64) string {
 	return fmt.Sprintf("%012x", id) + kind
 }
 
-func (d *OssDirectory) Load(kind string, id uint64) (*segment.Data, io.Closer, error) {
+func (d *OssDirectory) fullFilePath(kind string, id uint64) string {
 	path := filepath.Join(d.path, d.fileName(kind, id))
-	path = strings.TrimLeft(path, "/")
+
+	path = strings.TrimLeft(strings.Replace(path, "\\", "/", -1), "/")
+	return path
+}
+
+func (d *OssDirectory) Load(kind string, id uint64) (*segment.Data, io.Closer, error) {
+	path := d.fullFilePath(kind, id)
 	object, err := d.bucketCli.GetObject(path)
 	if err != nil {
 		d.logger.Error(err.Error(), zap.String("bucket", d.bucket), zap.String("path", path))
@@ -165,8 +171,7 @@ func (d *OssDirectory) Persist(kind string, id uint64, w index.WriterTo, closeCh
 
 	reader := bufio.NewReader(&buf)
 
-	path := filepath.Join(d.path, d.fileName(kind, id))
-	path = strings.TrimLeft(path, "/")
+	path := d.fullFilePath(kind, id)
 	err = d.bucketCli.PutObject(path, reader, oss.ContentType("application/octet-stream"))
 	if err != nil {
 		d.logger.Error(err.Error(), zap.String("bucket", d.bucket), zap.String("path", path), zap.Int64("size", size))
@@ -179,8 +184,7 @@ func (d *OssDirectory) Persist(kind string, id uint64, w index.WriterTo, closeCh
 }
 
 func (d *OssDirectory) Remove(kind string, id uint64) error {
-	path := filepath.Join(d.path, d.fileName(kind, id))
-	path = strings.TrimLeft(path, "/")
+	path := d.fullFilePath(kind, id)
 	if err := d.bucketCli.DeleteObject(path); err != nil {
 		d.logger.Error(err.Error(), zap.String("bucket", d.bucket), zap.String("path", path))
 		return err

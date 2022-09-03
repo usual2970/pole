@@ -35,18 +35,46 @@ var (
 	}
 )
 
-func NewIndexConfigWithUri(uri string) (bluge.Config, error) {
+type Lock interface {
+	Lock() error
+	Unlock() error
+}
+
+type IndexConfigArgs struct {
+	Uri    string
+	Lock   Lock
+	Logger *log.ZapLogger
+}
+
+type option func(op *IndexConfigArgs)
+
+func WithLock(lock Lock) option {
+	return func(op *IndexConfigArgs) {
+		op.Lock = lock
+	}
+}
+
+func NewIndexConfigWithUri(uri string, options ...option) (bluge.Config, error) {
 	var rs bluge.Config
 	url, err := url.Parse(uri)
 	if err != nil {
 		return rs, fmt.Errorf("%w:%s", errors.ErrInvalidUri, err.Error())
 	}
 
+	args := &IndexConfigArgs{
+		Uri:    uri,
+		Logger: log.WithField("module", "directory"),
+	}
+
+	for _, op := range options {
+		op(args)
+	}
+
 	switch SchemeType_value[url.Scheme] {
 	case SchemeTypeFile:
-		return FileIndexConfig(uri, log.WithField("module", "directory")), nil
+		return FileIndexConfig(args), nil
 	case SchemeTypeOss:
-		return OssIndexConfig(uri, "", log.WithField("module", "directory")), nil
+		return OssIndexConfig(args), nil
 	}
 	return rs, errors.ErrUnSupportedSchemeType
 }
