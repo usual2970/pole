@@ -36,8 +36,8 @@ var (
 )
 
 type Lock interface {
-	Lock() error
-	Unlock() error
+	Lock(index string) error
+	Unlock(index string) error
 }
 
 type IndexConfigArgs struct {

@@ -78,6 +78,8 @@ var (
 
 			<-quitCh
 
+			poled.Close()
+
 			raft.Stop(ctx)
 
 			grpcServer.Stop()
@@ -85,7 +87,6 @@ var (
 			if err := httpServer.Stop(); err != nil {
 				return err
 			}
-			poled.Close()
 
 			return nil
 		},

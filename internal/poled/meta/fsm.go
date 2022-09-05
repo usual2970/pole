@@ -31,6 +31,7 @@ type RaftLogData struct {
 	Index          string    `json:"index"`
 	Mapping        Mapping   `json:"mapping"`
 	LeaderGrpcAddr string    `json:"leaderGrpcAddr"`
+	LockUri        string    `json:"lockUri,omitempty"`
 }
 
 func (l *RaftLogData) String() string {
@@ -59,15 +60,17 @@ func NewBecomeLeaderCmd(leaderGrpcAddr string) ([]byte, error) {
 	})
 }
 
-func NewLockCmd() ([]byte, error) {
+func NewLockCmd(lockUri string) ([]byte, error) {
 	return json.Marshal(&RaftLogData{
-		Op: raftLogLock,
+		Op:      raftLogLock,
+		LockUri: lockUri,
 	})
 }
 
-func NewUnLockCmd() ([]byte, error) {
+func NewUnLockCmd(lockUri string) ([]byte, error) {
 	return json.Marshal(&RaftLogData{
-		Op: raftLogUnlock,
+		Op:      raftLogUnlock,
+		LockUri: lockUri,
 	})
 }
 
@@ -78,7 +81,7 @@ func (m *Meta) Apply(log *raft.Log) interface{} {
 		return nil
 	}
 	lg = lg.WithField("cmd", logData.String())
-
+	var rs interface{}
 	switch logData.Op {
 	case raftLogOpAdd:
 		m.Add(logData.Index, logData.Mapping)
@@ -87,13 +90,13 @@ func (m *Meta) Apply(log *raft.Log) interface{} {
 	case raftLogLeaderChange:
 		m.UpdateLeader(logData.LeaderGrpcAddr)
 	case raftLogLock:
-		return m.DLock()
+		rs = m.DLock(logData.LockUri)
 	case raftLogUnlock:
-		return m.DUnlock()
+		rs = m.DUnlock(logData.LockUri)
 
 	}
 	lg.Info("appply success")
-	return nil
+	return rs
 }
 
 func (m *Meta) Snapshot() (raft.FSMSnapshot, error) {
@@ -132,9 +135,9 @@ func (m *Meta) Leader() string {
 	return m.LeaderGrpcAddr
 }
 
-func (m *Meta) DLock() error {
+func (m *Meta) DLock(lockUri string) error {
 	m.RLock()
-	locked := m.dlocked()
+	locked := m.dlocked(lockUri)
 	m.RUnlock()
 
 	if locked {
@@ -143,29 +146,24 @@ func (m *Meta) DLock() error {
 
 	m.Lock()
 	defer m.Unlock()
-	m.DLocked = true
+	m.DLocked[lockUri] = struct{}{}
 	return nil
 }
 
-func (m *Meta) DUnlock() error {
+func (m *Meta) DUnlock(lockUri string) error {
 	m.RLock()
-	locked := m.dlocked()
+	locked := m.dlocked(lockUri)
 	m.RUnlock()
 	if !locked {
 		return ErrAlreadyUnlocked
 	}
 	m.Lock()
 	defer m.Unlock()
-	m.DLocked = false
+	delete(m.DLocked, lockUri)
 	return nil
 }
 
-func (m *Meta) IsDlocked() bool {
-	m.RLock()
-	defer m.RUnlock()
-	return m.dlocked()
-}
-
-func (m *Meta) dlocked() bool {
-	return m.DLocked
+func (m *Meta) dlocked(lockUri string) bool {
+	_, ok := m.DLocked[lockUri]
+	return ok
 }

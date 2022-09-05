@@ -5,15 +5,16 @@ import (
 )
 
 type Meta struct {
-	MetaData       map[string]Mapping `json:"metaData"`
-	LeaderGrpcAddr string             `json:"leaderGrpcAddr"`
-	DLocked          bool               `json:"dlock"`
+	MetaData       map[string]Mapping  `json:"metaData"`
+	LeaderGrpcAddr string              `json:"leaderGrpcAddr"`
+	DLocked        map[string]struct{} `json:"dlock"`
 	sync.RWMutex
 }
 
 func NewMeta() *Meta {
 	return &Meta{
 		MetaData: make(map[string]Mapping),
+		DLocked:  make(map[string]struct{}),
 	}
 }
 

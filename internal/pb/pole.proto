@@ -8,12 +8,16 @@ service Pole {
     rpc Unlock(UnlockRequest) returns (UnlockResponse){};
 }
 
-message LockRequest{}
+message LockRequest{
+    string lockUri=1;
+}
 message LockResponse{
     int32 code =1;
     string message =2;
 }
-message UnlockRequest{}
+message UnlockRequest{
+    string lockUri=1;
+}
 message UnlockResponse{
     int32 code =1;
     string message =2;

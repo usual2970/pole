@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"github.com/rs/xid"
 
 	"pole/internal/poled/clients"
 
@@ -38,6 +39,7 @@ type OssDirectory struct {
 	ctx            context.Context
 	requestTimeout time.Duration
 	lock           Lock
+	lockUri        string
 	logger         *log.ZapLogger
 }
 
@@ -69,8 +71,8 @@ func NewOssDirectoryWithUri(opts *IndexConfigArgs) *OssDirectory {
 		ctx:            context.Background(),
 		requestTimeout: 3 * time.Second,
 		lock:           opts.Lock,
-
-		logger: directoryLogger,
+		lockUri:        xid.New().String(),
+		logger:         directoryLogger,
 	}
 }
 
@@ -215,8 +217,8 @@ func (d *OssDirectory) Sync() error {
 
 func (d *OssDirectory) Lock() error {
 	// Create lock manager
-	return d.lock.Lock()
+	return d.lock.Lock(d.lockUri)
 }
 func (d *OssDirectory) Unlock() error {
-	return d.lock.Unlock()
+	return d.lock.Unlock(d.lockUri)
 }

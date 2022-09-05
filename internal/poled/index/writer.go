@@ -87,3 +87,9 @@ func (w *Writers) Get(idx string) (*Writer, bool) {
 
 	return writer, true
 }
+
+func (w *Writers) All() map[string]*Writer {
+	w.RLock()
+	defer w.RUnlock()
+	return w.Writers
+}
