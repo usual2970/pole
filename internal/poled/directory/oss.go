@@ -215,8 +215,8 @@ func (d *OssDirectory) Sync() error {
 
 func (d *OssDirectory) Lock() error {
 	// Create lock manager
-	return nil
+	return d.lock.Lock()
 }
 func (d *OssDirectory) Unlock() error {
-	return nil
+	return d.lock.Unlock()
 }
