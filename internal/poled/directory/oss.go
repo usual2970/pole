@@ -8,12 +8,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/url"
+	"path"
 	"path/filepath"
 	"pole/internal/poled/errors"
 	"pole/internal/util/log"
 	"strconv"
 	"strings"
 	"time"
+
 	"github.com/rs/xid"
 
 	"pole/internal/poled/clients"
@@ -67,7 +69,7 @@ func NewOssDirectoryWithUri(opts *IndexConfigArgs) *OssDirectory {
 	return &OssDirectory{
 		client:         client,
 		bucket:         u.Host,
-		path:           u.Path,
+		path:           path.Join(u.Path, opts.Idx),
 		ctx:            context.Background(),
 		requestTimeout: 3 * time.Second,
 		lock:           opts.Lock,
@@ -111,7 +113,7 @@ func (d *OssDirectory) Setup(readOnly bool) error {
 
 func (d *OssDirectory) List(kind string) ([]uint64, error) {
 
-	objects, err := d.bucketCli.ListObjectsV2()
+	objects, err := d.bucketCli.ListObjectsV2(oss.Prefix(strings.TrimLeft(d.path, "/")))
 	if err != nil {
 		return nil, err
 	}

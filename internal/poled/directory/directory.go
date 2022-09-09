@@ -41,6 +41,7 @@ type Lock interface {
 }
 
 type IndexConfigArgs struct {
+	Idx    string
 	Uri    string
 	Lock   Lock
 	Logger *log.ZapLogger
@@ -51,6 +52,12 @@ type option func(op *IndexConfigArgs)
 func WithLock(lock Lock) option {
 	return func(op *IndexConfigArgs) {
 		op.Lock = lock
+	}
+}
+
+func WithIdx(idx string) option {
+	return func(op *IndexConfigArgs) {
+		op.Idx = idx
 	}
 }
 

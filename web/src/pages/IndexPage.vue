@@ -19,7 +19,7 @@
             </template>
 
             <template v-slot:after>
-              <div class="q-pa-md"></div>
+              <div id="result-editor" class="p-editor"></div>
             </template>
           </q-splitter>
         </q-tab-panel>
@@ -35,8 +35,11 @@ import ace from "ace-builds";
 import "ace-builds/src-noconflict/mode-sql";
 import "ace-builds/src-noconflict/ext-searchbox";
 import "ace-builds/src-noconflict/ext-language_tools";
+import "ace-builds/src-noconflict/ext-beautify";
+
 import "ace-builds/src-noconflict/snippets/sql";
 import "ace-builds/src-noconflict/snippets/mysql";
+import "ace-builds/src-noconflict/mode-json";
 import { api } from "../boot/axios";
 import { useQuasar } from "quasar";
 
@@ -72,6 +75,8 @@ export default defineComponent({
   data() {
     return {
       editor: null,
+      resultEditor: null,
+      rs: null,
     };
   },
   methods: {
@@ -91,12 +96,23 @@ export default defineComponent({
         },
         readOnly: true, // false if this command should not apply in readOnly mode
       });
+
+      this.resultEditor = ace.edit("result-editor", {
+        mode: "ace/mode/json",
+        enableBasicAutocompletion: true,
+        enableSnippets: true,
+        readOnly: true,
+        enableLiveAutocompletion: true,
+      });
     },
     async exec(editor) {
       try {
         const rs = await api.get("/_sql", {
           params: { query: editor.getSelectedText() },
         });
+        this.resultEditor.setValue(JSON.stringify(rs.data));
+        const beautify = ace.require("ace/ext/beautify");
+        beautify.beautify(this.resultEditor.getSession());
       } catch (e) {
         this.alert("Error", e.message);
       }

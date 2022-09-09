@@ -69,7 +69,9 @@ func (p *Poled) Exec(sql string) result {
 	}
 
 	if p.raft.State() != raft.Leader {
-		return p.execByRpc(sql)
+		rs := p.execByRpc(sql)
+		p.readers.Delete(stmt.TableName)
+		return rs
 	}
 
 	switch stmt.ActionType {
@@ -199,7 +201,7 @@ func (p *Poled) execInsert(stmt *sqlParser.SqlVistor) result {
 	}
 
 	p.readers.Delete(idx)
-
+	lg.Info("insert success:", batch)
 	return newGeneralResult(nil)
 }
 
@@ -235,7 +237,7 @@ func (p *Poled) execCreate(stmt *sqlParser.SqlVistor) result {
 		}
 	}
 
-	if _, ok := p.writers.Get(p.conf.IndexUri); !ok {
+	if _, ok := p.writers.Get(idx); !ok {
 		return newGeneralResult(ErrWriterCreateFailed)
 	}
 

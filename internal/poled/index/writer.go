@@ -15,8 +15,8 @@ type Writer struct {
 	*bluge.Writer
 }
 
-func NewWriter(uri string, lock directory.Lock) (*Writer, error) {
-	conf, err := directory.NewIndexConfigWithUri(uri, directory.WithLock(lock))
+func NewWriter(idx, uri string, lock directory.Lock) (*Writer, error) {
+	conf, err := directory.NewIndexConfigWithUri(uri, directory.WithLock(lock), directory.WithIdx(idx))
 	if err != nil {
 		return nil, err
 	}
@@ -66,7 +66,7 @@ func (w *Writers) Get(idx string) (*Writer, bool) {
 	lg := log.WithField("module", "get writer")
 
 	rs, err, _ := wsg.Do(idx, func() (interface{}, error) {
-		return NewWriter(w.indexUri, w.lock)
+		return NewWriter(idx, w.indexUri, w.lock)
 	})
 
 	if err != nil {

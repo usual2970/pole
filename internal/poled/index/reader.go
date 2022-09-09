@@ -15,8 +15,8 @@ type Reader struct {
 	*bluge.Reader
 }
 
-func NewReader(uri string, lock directory.Lock) (*Reader, error) {
-	conf, err := directory.NewIndexConfigWithUri(uri, directory.WithLock(lock))
+func NewReader(idx, uri string, lock directory.Lock) (*Reader, error) {
+	conf, err := directory.NewIndexConfigWithUri(uri, directory.WithLock(lock), directory.WithIdx(idx))
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (r *Readers) Get(idx string) (*Reader, bool) {
 	lg := log.WithField("module", "get reader")
 
 	rs, err, _ := sg.Do(idx, func() (interface{}, error) {
-		return NewReader(r.indexUri, r.lock)
+		return NewReader(idx, r.indexUri, r.lock)
 	})
 
 	if err != nil {
